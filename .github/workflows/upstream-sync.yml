@@ -1,0 +1,64 @@
+# Weekly upstream sync: merges upstream/main into the tinyland branch.
+# Copy this to .github/workflows/upstream-sync.yml in each fork repo.
+#
+# When conflicts are detected, creates a PR for manual resolution.
+name: Upstream Sync
+
+on:
+  schedule:
+    - cron: '0 6 * * 1'  # Monday 6am UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  sync:
+    name: Sync upstream
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout tinyland branch
+        uses: actions/checkout@v4
+        with:
+          ref: tinyland
+          fetch-depth: 0
+
+      - name: Add upstream remote
+        run: |
+          git remote add upstream "$(gh repo view --json parent -q '.parent.url')" || true
+          git fetch upstream
+
+      - name: Attempt merge
+        id: merge
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          if git merge upstream/main --no-edit; then
+            echo "status=clean" >> "$GITHUB_OUTPUT"
+          else
+            git merge --abort
+            echo "status=conflict" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Push if clean
+        if: steps.merge.outputs.status == 'clean'
+        run: git push origin tinyland
+
+      - name: Create PR if conflict
+        if: steps.merge.outputs.status == 'conflict'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          BRANCH="upstream-sync-$(date +%Y%m%d)"
+          git checkout -b "$BRANCH"
+          git merge upstream/main --no-commit || true
+          git add -A
+          git commit -m "chore: upstream sync (conflicts need resolution)"
+          git push origin "$BRANCH"
+          gh pr create \
+            --title "chore: upstream sync $(date +%Y-%m-%d)" \
+            --body "Automated upstream sync has merge conflicts that need manual resolution." \
+            --base tinyland \
+            --head "$BRANCH"
