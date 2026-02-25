@@ -12,8 +12,7 @@
 
 FROM python:3.12-alpine
 
-# Install common security tools available in Alpine repos.
-# Heavy tools (nmap, sqlmap, nuclei) are optional — uncomment as needed.
+# Install common security tools + build deps for Python C extensions (psutil).
 RUN apk add --no-cache \
     ca-certificates \
     curl \
@@ -21,6 +20,10 @@ RUN apk add --no-cache \
     openssh-client \
     nmap \
     nmap-scripts \
+    gcc \
+    musl-dev \
+    linux-headers \
+    python3-dev \
     && rm -rf /var/cache/apk/*
 
 WORKDIR /app
@@ -35,7 +38,8 @@ RUN pip install --no-cache-dir \
     'psutil>=5.9.0,<6.0.0' \
     'fastmcp>=0.2.0,<1.0.0' \
     'beautifulsoup4>=4.12.0,<5.0.0' \
-    'aiohttp>=3.8.0,<4.0.0'
+    'aiohttp>=3.8.0,<4.0.0' \
+    && apk del gcc musl-dev linux-headers python3-dev
 
 # Optional: install extra deps at build time.
 # Build with: docker build --build-arg HEXSTRIKE_EXTRA_DEPS="selenium webdriver-manager" ...
