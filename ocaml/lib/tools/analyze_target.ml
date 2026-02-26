@@ -47,7 +47,7 @@ let execute (args : Yojson.Safe.t) : (string, string) result =
     Ok (Yojson.Safe.to_string json)
 
 let def : Tool_registry.tool_def = {
-  name = "analyze_target";
+  name = "target_profile";
   description = "Build comprehensive target profile with multi-phase reconnaissance";
   category = "Orchestration";
   risk_level = Policy.Medium;

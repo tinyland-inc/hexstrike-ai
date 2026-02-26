@@ -64,9 +64,15 @@ let match_caller pattern caller =
   else pattern = caller
 
 (** Check if a namespace matches. "*" matches everything.
-    "internal" only matches internal callers, "external" matches external. *)
-let match_namespace (dst : string) (_caller : string) =
-  dst = "*" (* TODO: classify callers as internal/external based on tailnet *)
+    "internal" matches tailnet callers (contain "@"), "external" matches others. *)
+let match_namespace (dst : string) (caller : string) =
+  if dst = "*" then true
+  else
+    let is_tailnet = String.contains caller '@' in
+    match dst with
+    | "internal" -> is_tailnet
+    | "external" -> not is_tailnet
+    | _ -> dst = "*"
 
 let default_compiled = { grants = []; denied = []; version = "default-allow" }
 

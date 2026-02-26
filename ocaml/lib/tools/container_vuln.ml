@@ -31,7 +31,7 @@ let execute (args : Yojson.Safe.t) : (string, string) result =
     | Error e -> Error e
 
 let def : Tool_registry.tool_def = {
-  name = "container_vuln";
+  name = "container_scan";
   description = "Scan container images for known vulnerabilities";
   category = "CloudSecurity";
   risk_level = Policy.Low;

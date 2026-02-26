@@ -5,7 +5,7 @@
 let test_register_and_find () =
   Tool_init.register_all ();
   let tools = Tool_registry.all_tools () in
-  Alcotest.(check bool) "has tools" true (List.length tools >= 11);
+  Alcotest.(check bool) "has 42 tools" true (List.length tools >= 42);
   Alcotest.(check bool) "find server_health" true
     (Option.is_some (Tool_registry.find "server_health"));
   Alcotest.(check bool) "find nonexistent" true
@@ -16,9 +16,37 @@ let test_tool_manifest () =
   let manifest = Tool_registry.tool_manifest () in
   match manifest with
   | `List tools ->
-    Alcotest.(check bool) "manifest has 11 tools" true (List.length tools >= 11)
+    Alcotest.(check bool) "manifest has 42 tools" true (List.length tools >= 42)
   | _ ->
     Alcotest.fail "manifest should be a JSON list"
+
+(* ── Tool Name Parity ────────────────────────────── *)
+
+(* These names MUST match dhall/policies/constants/tools.dhall *)
+let expected_tool_names = [
+  "server_health"; "execute_command";
+  "port_scan"; "host_discovery"; "nmap_scan"; "network_posture";
+  "subdomain_enum"; "dns_recon";
+  "tls_check";
+  "credential_scan"; "sops_rotation_check"; "brute_force"; "hash_crack";
+  "dir_discovery"; "vuln_scan"; "sqli_test"; "xss_test"; "waf_detect"; "web_crawl";
+  "api_fuzz"; "graphql_scan"; "jwt_analyze";
+  "smb_enum"; "network_exec"; "rpc_enum";
+  "cloud_posture"; "container_scan"; "iac_scan"; "k8s_audit";
+  "disassemble"; "debug"; "gadget_search"; "firmware_analyze";
+  "memory_forensics"; "file_carving"; "steganography"; "metadata_extract";
+  "cve_monitor"; "exploit_gen"; "threat_correlate";
+  "smart_scan"; "target_profile";
+]
+
+let test_tool_name_parity () =
+  Tool_init.register_all ();
+  let missing = List.filter (fun name ->
+    Option.is_none (Tool_registry.find name)
+  ) expected_tool_names in
+  if missing <> [] then
+    Alcotest.fail (Printf.sprintf "tools missing from registry: %s"
+      (String.concat ", " missing))
 
 (* ── Server Health ────────────────────────────────── *)
 
@@ -88,6 +116,23 @@ let test_policy_denied_over_grant () =
   match decision with
   | Policy.Denied _ -> ()
   | Policy.Allowed _ -> Alcotest.fail "denied list should override wildcard grant"
+
+let test_policy_namespace_internal () =
+  let grant = { Policy.src = "*"; dst = "internal";
+                app = ["port_scan"]; rate_limit = 0;
+                audit_level = Policy.Standard } in
+  let compiled = { Policy.default_compiled with grants = [grant] } in
+  let pol = { Policy.default_policy with compiled } in
+  (* tailnet caller (has @) should match "internal" *)
+  let d1 = Policy.evaluate pol ~caller:"alice@tailnet" "port_scan" Policy.Low in
+  (match d1 with
+   | Policy.Allowed _ -> ()
+   | Policy.Denied r -> Alcotest.fail ("tailnet caller should match internal: " ^ r));
+  (* external caller (no @) should NOT match "internal" *)
+  let d2 = Policy.evaluate pol ~caller:"anonymous" "port_scan" Policy.Low in
+  match d2 with
+  | Policy.Denied _ -> ()
+  | Policy.Allowed _ -> Alcotest.fail "non-tailnet caller should not match internal"
 
 (* ── Sanitize ─────────────────────────────────────── *)
 
@@ -195,6 +240,7 @@ let () =
     ("tool_registry", [
       Alcotest.test_case "register and find" `Quick test_register_and_find;
       Alcotest.test_case "tool manifest" `Quick test_tool_manifest;
+      Alcotest.test_case "dhall name parity" `Quick test_tool_name_parity;
     ]);
     ("server_health", [
       Alcotest.test_case "health returns ok" `Quick test_server_health;
@@ -206,6 +252,7 @@ let () =
       Alcotest.test_case "grant gate" `Quick test_policy_allowlist;
       Alcotest.test_case "grant match" `Quick test_policy_grant_match;
       Alcotest.test_case "denied over grant" `Quick test_policy_denied_over_grant;
+      Alcotest.test_case "namespace internal" `Quick test_policy_namespace_internal;
     ]);
     ("sanitize", [
       Alcotest.test_case "clean input" `Quick test_sanitize_clean;
