@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main, dev]
+    branches: [main, dev, "feat/**"]
   pull_request:
     branches: [main, dev]
 
@@ -13,17 +13,20 @@ concurrency:
 jobs:
   # ── Stage 1: Validate ──────────────────────────────
   dhall-check:
-    name: Dhall type-check
+    name: Dhall type-check + validate
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: DeterminateSystems/nix-installer-action@main
       - uses: DeterminateSystems/magic-nix-cache-action@main
       - run: nix develop --command just dhall-check
+      - run: nix develop --command just dhall-validate
 
   fstar-verify:
     name: F* verification
     runs-on: ubuntu-latest
+    continue-on-error: true  # F*/Z3 may need source build; non-blocking
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
       - uses: DeterminateSystems/nix-installer-action@main
@@ -52,6 +55,8 @@ jobs:
   fstar-extract:
     name: F* → OCaml extraction
     needs: [fstar-verify]
+    if: ${{ !cancelled() }}  # Run even if fstar-verify was skipped/failed
+    continue-on-error: true
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -87,7 +92,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: DeterminateSystems/nix-installer-action@main
       - uses: DeterminateSystems/magic-nix-cache-action@main
-      - run: nix develop --command bash -c 'cd gateway && go build ./...'
+      - run: nix develop --command just gateway-build
 
   policy-compile:
     name: Policy compile
@@ -105,7 +110,7 @@ jobs:
 
   # ── Stage 3: Test ──────────────────────────────────
   unit-test:
-    name: Unit tests
+    name: Unit tests (OCaml)
     needs: [ocaml-build]
     runs-on: ubuntu-latest
     steps:
@@ -114,15 +119,25 @@ jobs:
       - uses: DeterminateSystems/magic-nix-cache-action@main
       - run: nix develop --command just ocaml-test
 
+  futhark-test:
+    name: Futhark kernel tests
+    needs: [futhark-build]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: DeterminateSystems/nix-installer-action@main
+      - uses: DeterminateSystems/magic-nix-cache-action@main
+      - run: nix develop --command just futhark-test
+
   integration-test:
-    name: Integration tests
+    name: MCP integration tests
     needs: [ocaml-build]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: DeterminateSystems/nix-installer-action@main
       - uses: DeterminateSystems/magic-nix-cache-action@main
-      - run: nix develop --command bash -c 'dune build --root ocaml && bash test/integration/test_mcp_roundtrip.sh ocaml/_build/default/bin/main.exe'
+      - run: nix develop --command bash -c 'dune build --root ocaml && bash test/integration/test_mcp_roundtrip.sh'
 
   gateway-test:
     name: Gateway tests
@@ -132,4 +147,30 @@ jobs:
       - uses: actions/checkout@v4
       - uses: DeterminateSystems/nix-installer-action@main
       - uses: DeterminateSystems/magic-nix-cache-action@main
-      - run: nix develop --command bash -c 'cd gateway && go test ./...'
+      - run: nix develop --command just gateway-test
+
+  # ── Stage 4: Package ─────────────────────────────────
+  nix-packages:
+    name: Nix package builds
+    needs: [unit-test, gateway-test, integration-test]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: DeterminateSystems/nix-installer-action@main
+      - uses: DeterminateSystems/magic-nix-cache-action@main
+      - run: nix build .#hexstrike-mcp
+      - run: nix build .#hexstrike-gateway
+      - run: nix build .#hexstrike-policies
+
+  container:
+    name: OCI container build
+    needs: [nix-packages]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: DeterminateSystems/nix-installer-action@main
+      - uses: DeterminateSystems/magic-nix-cache-action@main
+      - run: nix build .#container
+      - run: |
+          echo "Container image: $(ls -lh result)"
+          echo "Image size: $(du -h result | cut -f1)"

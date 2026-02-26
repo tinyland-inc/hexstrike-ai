@@ -100,6 +100,15 @@ gateway-vet:
     cd gateway && go vet ./...
     @echo ":: gateway vet OK"
 
+# ── Integration ───────────────────────────────────────
+
+# Run MCP round-trip integration tests
+integration-test:
+    @echo ":: integration test"
+    dune build --root ocaml
+    bash test/integration/test_mcp_roundtrip.sh
+    @echo ":: integration test OK"
+
 # ── Composite ──────────────────────────────────────────
 
 # Start MCP server on stdio (for testing)
@@ -110,7 +119,7 @@ serve:
 build: dhall-check dhall-render futhark-build ocaml-build gateway-build
 
 # Run all tests
-test: ocaml-test futhark-test gateway-test
+test: ocaml-test futhark-test gateway-test integration-test
 
 # Build + test
 all: build test
