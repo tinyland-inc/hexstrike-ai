@@ -1,17 +1,27 @@
 # HexStrike-AI Tool Reference
 
-## Native Security Tools (Flask API on port 8888)
+## Native Security Tools (42 tools via MCP)
 
-HexStrike-AI exposes security tools via its Flask REST API:
+HexStrike-AI exposes 42 verified security tools via JSON-RPC 2.0 (MCP protocol).
+The Go gateway proxies MCP requests to the OCaml server over stdio.
 
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/api/command` | POST | Execute security commands (nmap, curl, etc.) |
-| `/api/intelligence/smart-scan` | POST | AI-driven scan with automatic tool selection |
-| `/api/intelligence/analyze-target` | POST | Target profiling and reconnaissance |
-| `/api/error-handling/execute-with-recovery` | POST | Commands with retry/recovery |
+| Domain | Tools | Count |
+|--------|-------|-------|
+| WebSecurity | dir_discovery, vuln_scan, sqli_test, xss_test, waf_detect, web_crawl | 6 |
+| NetworkRecon | port_scan, host_discovery, nmap_scan, network_posture | 4 |
+| Forensics | memory_forensics, file_carving, steganography, metadata_extract | 4 |
+| CredentialAudit | credential_scan, sops_rotation_check, brute_force, hash_crack | 4 |
+| CloudSecurity | cloud_posture, container_scan, iac_scan, k8s_audit | 4 |
+| BinaryAnalysis | disassemble, debug, gadget_search, firmware_analyze | 4 |
+| SMBEnum | smb_enum, network_exec, rpc_enum | 3 |
+| Intelligence | cve_monitor, exploit_gen, threat_correlate | 3 |
+| APITesting | api_fuzz, graphql_scan, jwt_analyze | 3 |
+| Orchestration | smart_scan, target_profile | 2 |
+| Meta | server_health, execute_command | 2 |
+| DNSRecon | subdomain_enum, dns_recon | 2 |
+| CryptoAnalysis | tls_check | 1 |
 
-## Platform Tools via Adapter Proxy (51 total: 15 gateway + 36 Chapel)
+## Platform Tools via Adapter Proxy
 
 Platform tools provided by the adapter sidecar, proxied from rj-gateway.
 
@@ -113,7 +123,7 @@ Gateway endpoint: `http://rj-gateway.fuzzy-dev.svc.cluster.local:8080/mcp`
 - **GitHub token**: Automatically resolved by gateway
 - **NET_RAW/NET_ADMIN**: Container has network capabilities for security scanning
 - **Rate limits**: GitHub API has rate limits. Space out bulk fetches
-- **Tool timeouts**: MCP tools have a 30s default timeout
+- **Tool timeouts**: MCP tools have per-tool timeouts (5s-600s); see Dhall schemas
 - **Scope**: Only scan tinyland-inc infrastructure and authorized targets
 - **Credentials**: Never store raw credentials in findings — reference by name only
 

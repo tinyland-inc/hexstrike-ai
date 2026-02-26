@@ -1,0 +1,4 @@
+(executable
+ (name main)
+ (public_name hexstrike-mcp)
+ (libraries hexstrike_lib yojson cmdliner logs logs.fmt fmt fmt.tty))
