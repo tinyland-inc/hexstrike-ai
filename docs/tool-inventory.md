@@ -290,16 +290,17 @@ The server has exactly **4 routes**:
 
 ---
 
-## Consolidated Tool Taxonomy (42 tools across 12 domains)
+## Consolidated Tool Taxonomy (42 tools across 13 domains)
 
 | Domain | Tools | Count |
 |--------|-------|-------|
-| NetworkRecon | `port_scan`, `host_discovery` | 2 |
+| Meta | `server_health`, `execute_command` | 2 |
+| NetworkRecon | `port_scan`, `host_discovery`, `nmap_scan`, `network_posture` | 4 |
 | DNSRecon | `subdomain_enum`, `dns_recon` | 2 |
 | WebSecurity | `dir_discovery`, `vuln_scan`, `sqli_test`, `xss_test`, `waf_detect`, `web_crawl` | 6 |
 | APITesting | `api_fuzz`, `graphql_scan`, `jwt_analyze` | 3 |
 | CryptoAnalysis | `tls_check` | 1 |
-| CredentialAudit | `credential_scan`, `brute_force`, `hash_crack` | 3 |
+| CredentialAudit | `credential_scan`, `sops_rotation_check`, `brute_force`, `hash_crack` | 4 |
 | SMBEnum | `smb_enum`, `network_exec`, `rpc_enum` | 3 |
 | CloudSecurity | `cloud_posture`, `container_scan`, `iac_scan`, `k8s_audit` | 4 |
 | BinaryAnalysis | `disassemble`, `debug`, `gadget_search`, `firmware_analyze` | 4 |
