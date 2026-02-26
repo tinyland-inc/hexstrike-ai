@@ -28,11 +28,11 @@ let run ?(timeout_secs=300) (argv : string list) : exec_result =
   in
   let cmd = String.concat " " (List.map Filename.quote sanitized) in
   let t0 = Unix.gettimeofday () in
-  (* Use timeout(1) if available for hard kill *)
-  let full_cmd = Printf.sprintf "timeout %d %s 2>&1" timeout_secs cmd in
-  let ic = Unix.open_process_in full_cmd in
-  let output = read_all ic in
-  let status = Unix.close_process_in ic in
+  let full_cmd = Printf.sprintf "timeout %d %s" timeout_secs cmd in
+  let (stdout_ic, _stdin_oc, stderr_ic) = Unix.open_process_full full_cmd (Unix.environment ()) in
+  let stdout_output = read_all stdout_ic in
+  let stderr_output = read_all stderr_ic in
+  let status = Unix.close_process_full (stdout_ic, _stdin_oc, stderr_ic) in
   let t1 = Unix.gettimeofday () in
   let duration_ms = int_of_float ((t1 -. t0) *. 1000.0) in
   let exit_code = match status with
@@ -41,7 +41,7 @@ let run ?(timeout_secs=300) (argv : string list) : exec_result =
     | Unix.WSTOPPED _ -> 143
   in
   let timed_out = exit_code = 124 in  (* timeout(1) returns 124 *)
-  { exit_code; stdout = output; stderr = ""; duration_ms; timed_out }
+  { exit_code; stdout = stdout_output; stderr = stderr_output; duration_ms; timed_out }
 
 let run_safe ?(timeout_secs=300) (argv : string list) : (exec_result, string) result =
   try Ok (run ~timeout_secs argv)

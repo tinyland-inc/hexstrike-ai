@@ -36,7 +36,7 @@ let execute (args : Yojson.Safe.t) : (string, string) result =
         ("line_count", `Int (List.length lines));
         ("disassembly", `String res.stdout);
       ] in
-      Ok (Yojson.Safe.to_string json)
+      Ok (Tool_output.wrap_result ~tool_name:"disassemble" ~target:file res json)
     | Error e -> Error e
 
 let def : Tool_registry.tool_def = {
@@ -45,6 +45,7 @@ let def : Tool_registry.tool_def = {
   category = "BinaryAnalysis";
   risk_level = Policy.Low;
   max_exec_secs = 60;
+  required_binary = Some "objdump";
   input_schema = schema;
   execute;
 }

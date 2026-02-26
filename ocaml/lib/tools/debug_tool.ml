@@ -45,9 +45,8 @@ let execute (args : Yojson.Safe.t) : (string, string) result =
         ("file", `String file);
         ("commands", `List (List.map (fun s -> `String s) gdb_cmds));
         ("output", `String (String.trim res.stdout));
-        ("exit_code", `Int res.exit_code);
       ] in
-      Ok (Yojson.Safe.to_string json)
+      Ok (Tool_output.wrap_result ~tool_name:"debug" ~target:file res json)
     | Error e -> Error e
 
 let def : Tool_registry.tool_def = {
@@ -56,6 +55,7 @@ let def : Tool_registry.tool_def = {
   category = "BinaryAnalysis";
   risk_level = Policy.Medium;
   max_exec_secs = 60;
+  required_binary = Some "gdb";
   input_schema = schema;
   execute;
 }

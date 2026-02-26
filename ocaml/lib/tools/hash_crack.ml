@@ -59,7 +59,7 @@ let execute (args : Yojson.Safe.t) : (string, string) result =
         ("results", `List (List.map (fun s -> `String s) lines));
         ("cracked_count", `Int (List.length lines - 1)); (* last line is summary *)
       ] in
-      Ok (Yojson.Safe.to_string json)
+      Ok (Tool_output.wrap_result ~tool_name:"hash_crack" ~target:hash res json)
     | Error e -> Error e
 
 let def : Tool_registry.tool_def = {
@@ -68,6 +68,7 @@ let def : Tool_registry.tool_def = {
   category = "CredentialAudit";
   risk_level = Policy.High;
   max_exec_secs = 300;
+  required_binary = Some "john";
   input_schema = schema;
   execute;
 }

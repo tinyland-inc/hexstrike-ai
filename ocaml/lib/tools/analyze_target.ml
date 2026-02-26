@@ -44,7 +44,7 @@ let execute (args : Yojson.Safe.t) : (string, string) result =
       ("ports", `String port_result);
       ("tls", `String (String.trim tls_result));
     ] in
-    Ok (Yojson.Safe.to_string json)
+    Ok (Tool_output.wrap_pure ~tool_name:"target_profile" ~target json)
 
 let def : Tool_registry.tool_def = {
   name = "target_profile";
@@ -52,6 +52,7 @@ let def : Tool_registry.tool_def = {
   category = "Orchestration";
   risk_level = Policy.Medium;
   max_exec_secs = 120;
+  required_binary = None;
   input_schema = schema;
   execute;
 }

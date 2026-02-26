@@ -32,30 +32,13 @@ let execute (args : Yojson.Safe.t) : (string, string) result =
                @ profile_args in
     match Subprocess.run_safe ~timeout_secs:1800 argv with
     | Ok res ->
-      (try
-        let _ = Yojson.Safe.from_string res.stdout in
-        Ok res.stdout
-      with _ ->
-        let json = `Assoc [
-          ("provider", `String provider);
-          ("raw_output", `String (String.trim res.stdout));
-          ("exit_code", `Int res.exit_code);
-        ] in
-        Ok (Yojson.Safe.to_string json))
+      Ok (Tool_output.wrap_json ~tool_name:"cloud_posture" ~target:provider res)
     | Error _ ->
       (* Fallback to trivy cloud *)
       let trivy_argv = ["trivy"; "cloud"; "--format"; "json"; "--cloud-provider"; provider] in
       match Subprocess.run_safe ~timeout_secs:600 trivy_argv with
       | Ok res ->
-        (try
-          let _ = Yojson.Safe.from_string res.stdout in
-          Ok res.stdout
-        with _ ->
-          let json = `Assoc [
-            ("provider", `String provider);
-            ("raw_output", `String (String.trim res.stdout));
-          ] in
-          Ok (Yojson.Safe.to_string json))
+        Ok (Tool_output.wrap_json ~tool_name:"cloud_posture" ~target:provider res)
       | Error e -> Error e
 
 let def : Tool_registry.tool_def = {
@@ -64,6 +47,7 @@ let def : Tool_registry.tool_def = {
   category = "CloudSecurity";
   risk_level = Policy.Medium;
   max_exec_secs = 1800;
+  required_binary = Some "trivy";
   input_schema = schema;
   execute;
 }

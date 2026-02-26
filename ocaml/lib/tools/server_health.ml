@@ -15,7 +15,7 @@ let execute (_args : Yojson.Safe.t) : (string, string) result =
     ("tools_available", `Int (List.length tools));
     ("tool_names", `List (List.map (fun n -> `String n) tool_names));
   ] in
-  Ok (Yojson.Safe.to_string json)
+  Ok (Tool_output.wrap_pure ~tool_name:"server_health" ~target:"server" json)
 
 let def : Tool_registry.tool_def = {
   name = "server_health";
@@ -23,6 +23,7 @@ let def : Tool_registry.tool_def = {
   category = "Orchestration";
   risk_level = Policy.Info;
   max_exec_secs = 5;
+  required_binary = None;
   input_schema = schema;
   execute;
 }

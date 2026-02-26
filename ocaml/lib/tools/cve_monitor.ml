@@ -32,17 +32,14 @@ let execute (args : Yojson.Safe.t) : (string, string) result =
       | Some kw -> Printf.sprintf "https://services.nvd.nist.gov/rest/json/cves/2.0?keywordSearch=%s&resultsPerPage=20" kw
       | None -> "https://services.nvd.nist.gov/rest/json/cves/2.0?resultsPerPage=10"
   in
+  let target = match cve_id with
+    | Some id -> id
+    | None -> (match keyword with Some kw -> kw | None -> "recent")
+  in
   let argv = ["curl"; "-sf"; "-H"; "Accept: application/json"; "-m"; "30"; url] in
   match Subprocess.run_safe ~timeout_secs:60 argv with
   | Ok res ->
-    (try
-      let _ = Yojson.Safe.from_string res.stdout in
-      Ok res.stdout
-    with _ ->
-      let json = `Assoc [
-        ("raw_output", `String (String.trim res.stdout));
-      ] in
-      Ok (Yojson.Safe.to_string json))
+    Ok (Tool_output.wrap_json ~tool_name:"cve_monitor" ~target res)
   | Error e -> Error e
 
 let def : Tool_registry.tool_def = {
@@ -51,6 +48,7 @@ let def : Tool_registry.tool_def = {
   category = "Intelligence";
   risk_level = Policy.Info;
   max_exec_secs = 60;
+  required_binary = Some "curl";
   input_schema = schema;
   execute;
 }

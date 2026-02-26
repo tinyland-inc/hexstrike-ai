@@ -88,7 +88,7 @@ let execute (args : Yojson.Safe.t) : (string, string) result =
         ("issues", `List (List.map (fun s -> `String s) issues));
         ("issue_count", `Int (List.length issues));
       ] in
-      Ok (Yojson.Safe.to_string json)
+      Ok (Tool_output.wrap_pure ~tool_name:"jwt_analyze" ~target:token json)
     | _ -> Error "invalid JWT format: expected 3 dot-separated parts"
 
 let def : Tool_registry.tool_def = {
@@ -97,6 +97,7 @@ let def : Tool_registry.tool_def = {
   category = "APITesting";
   risk_level = Policy.Low;
   max_exec_secs = 5;
+  required_binary = None;
   input_schema = schema;
   execute;
 }

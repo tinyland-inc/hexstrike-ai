@@ -57,9 +57,8 @@ let execute (args : Yojson.Safe.t) : (string, string) result =
         ("protocol", `String protocol);
         ("command", `String command);
         ("output", `String (String.trim res.stdout));
-        ("exit_code", `Int res.exit_code);
       ] in
-      Ok (Yojson.Safe.to_string json)
+      Ok (Tool_output.wrap_result ~tool_name:"network_exec" ~target res json)
     | Error e -> Error e
 
 let def : Tool_registry.tool_def = {
@@ -68,6 +67,7 @@ let def : Tool_registry.tool_def = {
   category = "SMBEnum";
   risk_level = Policy.Critical;
   max_exec_secs = 60;
+  required_binary = Some "ssh";
   input_schema = schema;
   execute;
 }

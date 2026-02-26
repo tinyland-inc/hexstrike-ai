@@ -2,7 +2,7 @@
     Every tool here MUST have a corresponding Dhall schema in dhall/tools/*.dhall
     and a constant in dhall/policies/constants/tools.dhall. *)
 
-let register_all () =
+let rec register_all () =
   List.iter Tool_registry.register [
     (* Meta *)
     Server_health.def;
@@ -60,4 +60,30 @@ let register_all () =
     Smart_scan.def;
     Analyze_target.def;
   ];
-  Logs.info (fun m -> m "registered %d tools" (List.length (Tool_registry.all_tools ())))
+  Logs.info (fun m -> m "registered %d tools" (List.length (Tool_registry.all_tools ())));
+  check_binaries ()
+
+and check_binaries () =
+  let tools = Tool_registry.all_tools () in
+  let missing = List.filter_map (fun (t : Tool_registry.tool_def) ->
+    match t.required_binary with
+    | None -> None
+    | Some bin ->
+      let found =
+        try
+          let ic = Unix.open_process_in (Printf.sprintf "command -v %s 2>/dev/null" (Filename.quote bin)) in
+          let _ = try input_line ic with End_of_file -> "" in
+          let st = Unix.close_process_in ic in
+          st = Unix.WEXITED 0
+        with _ -> false
+      in
+      if found then None
+      else Some (t.name, bin)
+  ) tools in
+  List.iter (fun (tool, bin) ->
+    Logs.warn (fun m -> m "tool %s: required binary '%s' not found in PATH" tool bin)
+  ) missing;
+  if missing = [] then
+    Logs.info (fun m -> m "all tool binaries available")
+  else
+    Logs.warn (fun m -> m "%d tool(s) have missing binaries" (List.length missing))

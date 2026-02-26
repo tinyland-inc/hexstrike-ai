@@ -69,7 +69,7 @@ let execute (args : Yojson.Safe.t) : (string, string) result =
       ("tools_run", `Int (List.length results));
       ("results", `Assoc results);
     ] in
-    Ok (Yojson.Safe.to_string json)
+    Ok (Tool_output.wrap_pure ~tool_name:"smart_scan" ~target json)
 
 let def : Tool_registry.tool_def = {
   name = "smart_scan";
@@ -77,6 +77,7 @@ let def : Tool_registry.tool_def = {
   category = "Orchestration";
   risk_level = Policy.High;
   max_exec_secs = 1800;
+  required_binary = None;
   input_schema = schema;
   execute;
 }

@@ -44,7 +44,7 @@ let execute (args : Yojson.Safe.t) : (string, string) result =
           (if introspection_enabled then [`String "introspection_enabled"] else [])
         ));
       ] in
-      Ok (Yojson.Safe.to_string json)
+      Ok (Tool_output.wrap_result ~tool_name:"graphql_scan" ~target:url res json)
     | Error e -> Error e
 
 let def : Tool_registry.tool_def = {
@@ -53,6 +53,7 @@ let def : Tool_registry.tool_def = {
   category = "APITesting";
   risk_level = Policy.Medium;
   max_exec_secs = 60;
+  required_binary = Some "curl";
   input_schema = schema;
   execute;
 }

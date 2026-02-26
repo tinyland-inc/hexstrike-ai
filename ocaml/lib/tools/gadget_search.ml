@@ -50,7 +50,7 @@ let execute (args : Yojson.Safe.t) : (string, string) result =
                              else lines)));
         ("truncated", `Bool (List.length lines > 100));
       ] in
-      Ok (Yojson.Safe.to_string json)
+      Ok (Tool_output.wrap_result ~tool_name:"gadget_search" ~target:file res json)
     | Error e -> Error e
 
 let def : Tool_registry.tool_def = {
@@ -59,6 +59,7 @@ let def : Tool_registry.tool_def = {
   category = "BinaryAnalysis";
   risk_level = Policy.Low;
   max_exec_secs = 120;
+  required_binary = Some "ROPgadget";
   input_schema = schema;
   execute;
 }

@@ -26,8 +26,8 @@ let execute (args : Yojson.Safe.t) : (string, string) result =
     let argv = ["trivy"; "image"; "--severity"; severity; "--format"; "json"; image] in
     match Subprocess.run_safe ~timeout_secs:300 argv with
     | Ok res ->
-      if res.exit_code = 0 then Ok res.stdout
-      else Error (Printf.sprintf "trivy exited %d: %s" res.exit_code res.stdout)
+      if res.exit_code = 0 then Ok (Tool_output.wrap_json ~tool_name:"container_scan" ~target:image res)
+      else Ok (Tool_output.wrap_error ~tool_name:"container_scan" ~target:image res)
     | Error e -> Error e
 
 let def : Tool_registry.tool_def = {
@@ -36,6 +36,7 @@ let def : Tool_registry.tool_def = {
   category = "CloudSecurity";
   risk_level = Policy.Low;
   max_exec_secs = 300;
+  required_binary = Some "trivy";
   input_schema = schema;
   execute;
 }

@@ -28,9 +28,8 @@ let execute (args : Yojson.Safe.t) : (string, string) result =
       let json = `Assoc [
         ("target", `String target);
         ("rpc_info", `List (List.map (fun s -> `String (String.trim s)) lines));
-        ("exit_code", `Int res.exit_code);
       ] in
-      Ok (Yojson.Safe.to_string json)
+      Ok (Tool_output.wrap_result ~tool_name:"rpc_enum" ~target res json)
     | Error e -> Error e
 
 let def : Tool_registry.tool_def = {
@@ -39,6 +38,7 @@ let def : Tool_registry.tool_def = {
   category = "SMBEnum";
   risk_level = Policy.Medium;
   max_exec_secs = 60;
+  required_binary = Some "rpcclient";
   input_schema = schema;
   execute;
 }

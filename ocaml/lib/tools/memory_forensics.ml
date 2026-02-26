@@ -35,17 +35,7 @@ let execute (args : Yojson.Safe.t) : (string, string) result =
     let argv = ["vol"; "-f"; file; "-r"; "json"; plugin_name] in
     match Subprocess.run_safe ~timeout_secs:600 argv with
     | Ok res ->
-      (try
-        let _ = Yojson.Safe.from_string res.stdout in
-        Ok res.stdout
-      with _ ->
-        let json = `Assoc [
-          ("file", `String file);
-          ("plugin", `String plugin_name);
-          ("raw_output", `String (String.trim res.stdout));
-          ("exit_code", `Int res.exit_code);
-        ] in
-        Ok (Yojson.Safe.to_string json))
+      Ok (Tool_output.wrap_json ~tool_name:"memory_forensics" ~target:file res)
     | Error e -> Error e
 
 let def : Tool_registry.tool_def = {
@@ -54,6 +44,7 @@ let def : Tool_registry.tool_def = {
   category = "Forensics";
   risk_level = Policy.Medium;
   max_exec_secs = 600;
+  required_binary = Some "vol";
   input_schema = schema;
   execute;
 }

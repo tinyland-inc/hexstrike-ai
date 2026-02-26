@@ -37,12 +37,10 @@ let execute (args : Yojson.Safe.t) : (string, string) result =
         | Ok res ->
           let json = `Assoc [
             ("command", `String command);
-            ("exit_code", `Int res.exit_code);
             ("output", `String res.stdout);
-            ("duration_ms", `Int res.duration_ms);
             ("timed_out", `Bool res.timed_out);
           ] in
-          Ok (Yojson.Safe.to_string json)
+          Ok (Tool_output.wrap_result ~tool_name:"execute_command" ~target:command res json)
         | Error e -> Error e
 
 let def : Tool_registry.tool_def = {
@@ -51,6 +49,7 @@ let def : Tool_registry.tool_def = {
   category = "Orchestration";
   risk_level = Policy.High;
   max_exec_secs = 300;
+  required_binary = None;
   input_schema = schema;
   execute;
 }
