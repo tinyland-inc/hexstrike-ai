@@ -1,6 +1,6 @@
-# HexStrike-AI
+# HexStrunk ^w^
 
-Auditable, provable cybersecurity MCP platform. 42 tools across 13 domains, with verified dispatch, hash-chain audit, and grants-as-capabilities policy enforcement.
+Auditable, provable cybersecurity MCP platform. 42 tools across 13 domains, with verified dispatch, hash-chain audit, and grants-as-capabilities policy enforcement.  Inspired by HexStrike.
 
 ## Architecture
 
