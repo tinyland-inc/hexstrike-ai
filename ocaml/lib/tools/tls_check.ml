@@ -28,7 +28,7 @@ let execute (args : Yojson.Safe.t) : (string, string) result =
       "-brief"
     ] in
     match Subprocess.run_safe ~timeout_secs:30 argv with
-    | Ok res -> Ok res.stdout
+    | Ok res -> Ok (Tool_output.wrap_json ~tool_name:"tls_check" ~target res)
     | Error e -> Error e
 
 let def : Tool_registry.tool_def = {
@@ -37,6 +37,7 @@ let def : Tool_registry.tool_def = {
   category = "CryptoAnalysis";
   risk_level = Policy.Low;
   max_exec_secs = 30;
+  required_binary = Some "openssl";
   input_schema = schema;
   execute;
 }

@@ -48,7 +48,7 @@ let execute (args : Yojson.Safe.t) : (string, string) result =
           with _ -> `String s
         ) lines));
       ] in
-      Ok (Yojson.Safe.to_string json)
+      Ok (Tool_output.wrap_result ~tool_name:"vuln_scan" ~target res json)
     | Error e -> Error e
 
 let def : Tool_registry.tool_def = {
@@ -57,6 +57,7 @@ let def : Tool_registry.tool_def = {
   category = "WebSecurity";
   risk_level = Policy.High;
   max_exec_secs = 900;
+  required_binary = Some "nuclei";
   input_schema = schema;
   execute;
 }

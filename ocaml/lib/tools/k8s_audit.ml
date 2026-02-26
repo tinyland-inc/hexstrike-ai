@@ -15,19 +15,11 @@ let schema : Yojson.Safe.t =
   ]
 
 let execute (args : Yojson.Safe.t) : (string, string) result =
-  let _target = args |> member "target" |> to_string_option in
+  let target = args |> member "target" |> to_string_option |> Option.value ~default:"current-context" in
   let argv = ["kube-bench"; "run"; "--json"] in
   match Subprocess.run_safe ~timeout_secs:300 argv with
   | Ok res ->
-    (try
-      let _ = Yojson.Safe.from_string res.stdout in
-      Ok res.stdout
-    with _ ->
-      let json = `Assoc [
-        ("raw_output", `String (String.trim res.stdout));
-        ("exit_code", `Int res.exit_code);
-      ] in
-      Ok (Yojson.Safe.to_string json))
+    Ok (Tool_output.wrap_json ~tool_name:"k8s_audit" ~target res)
   | Error e -> Error e
 
 let def : Tool_registry.tool_def = {
@@ -36,6 +28,7 @@ let def : Tool_registry.tool_def = {
   category = "CloudSecurity";
   risk_level = Policy.Medium;
   max_exec_secs = 300;
+  required_binary = Some "kube-bench";
   input_schema = schema;
   execute;
 }

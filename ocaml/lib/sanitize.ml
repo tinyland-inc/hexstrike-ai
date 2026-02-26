@@ -1,26 +1,16 @@
-(** Input sanitization — OCaml mirror of Hexstrike.Sanitize.fst.
-    Rejects strings containing shell metacharacters. *)
+(** Input sanitization — thin wrapper over verified Hexstrike_Sanitize.
+    Adds result-based API and batch sanitization on top of the F*-extracted core. *)
 
-let shell_metachars = [ '|'; '&'; ';'; '$'; '`'; '('; ')'; '{'; '}'; '<'; '>'; '\n'; '\r' ]
-
-let is_shell_meta c = List.mem c shell_metachars
-
-let has_shell_meta s =
-  let len = String.length s in
-  let rec check i =
-    if i >= len then false
-    else if is_shell_meta s.[i] then true
-    else check (i + 1)
-  in
-  check 0
+let shell_metachars = Hexstrike_Sanitize.shell_metachars
+let is_shell_meta = Hexstrike_Sanitize.is_shell_meta
+let has_shell_meta = Hexstrike_Sanitize.has_shell_meta
 
 type sanitized = private string
 
 let sanitize (s : string) : (string, string) result =
-  if has_shell_meta s then
-    Error (Printf.sprintf "input contains shell metacharacters: %S" s)
-  else
-    Ok s
+  match Hexstrike_Sanitize.sanitize s with
+  | Some clean -> Ok clean
+  | None -> Error (Printf.sprintf "input contains shell metacharacters: %S" s)
 
 let sanitize_all (args : (string * string) list) : ((string * string) list, string) result =
   let rec go acc = function

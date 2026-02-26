@@ -35,9 +35,8 @@ let execute (args : Yojson.Safe.t) : (string, string) result =
       let json = `Assoc [
         ("url", `String url);
         ("output", `String (String.trim res.stdout));
-        ("exit_code", `Int res.exit_code);
       ] in
-      Ok (Yojson.Safe.to_string json)
+      Ok (Tool_output.wrap_result ~tool_name:"sqli_test" ~target:url res json)
     | Error e -> Error e
 
 let def : Tool_registry.tool_def = {
@@ -46,6 +45,7 @@ let def : Tool_registry.tool_def = {
   category = "WebSecurity";
   risk_level = Policy.High;
   max_exec_secs = 600;
+  required_binary = Some "sqlmap";
   input_schema = schema;
   execute;
 }

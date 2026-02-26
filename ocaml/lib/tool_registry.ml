@@ -7,6 +7,7 @@ type tool_def = {
   category : string;
   risk_level : Policy.severity;
   max_exec_secs : int;
+  required_binary : string option;
   input_schema : Yojson.Safe.t;
   execute : Yojson.Safe.t -> (string, string) result;
 }

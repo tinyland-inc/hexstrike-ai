@@ -1,77 +1,51 @@
 (** C FFI bridge to Futhark compiled kernels.
 
-    In Sprint 2, Futhark compiles to C libraries via `futhark c --library`.
-    This module provides OCaml bindings via Ctypes (when available) or
-    falls back to stub implementations for environments without GPU support.
+    Dispatches to Ctypes FFI (futhark_ffi.ml) when compiled shared libraries
+    are loadable, otherwise falls back to pure-OCaml stubs (futhark_stubs.ml).
 
-    The real FFI is wired up when the C libraries are present in the build. *)
+    Callers use the same interface regardless of backend. *)
 
-(* Stub: batch port scan analysis *)
-let count_open_ports (scan_results : int array array) : int array =
-  Array.map (fun row ->
-    Array.fold_left (fun acc s -> if s = 1 then acc + 1 else acc) 0 row
-  ) scan_results
+let ffi_available = lazy (
+  try ignore (Futhark_ffi.Scan.context ()); true
+  with _ -> false
+)
 
-let high_exposure_hosts (scan_results : int array array) (threshold : int) : bool array =
-  let counts = count_open_ports scan_results in
-  Array.map (fun c -> c > threshold) counts
+let using_ffi () = Lazy.force ffi_available
 
-let port_frequency (scan_results : int array array) : int array =
-  if Array.length scan_results = 0 then [||]
-  else
-    let num_ports = Array.length scan_results.(0) in
-    Array.init num_ports (fun col ->
-      Array.fold_left (fun acc row ->
-        if row.(col) = 1 then acc + 1 else acc
-      ) 0 scan_results
-    )
+(* ── Scan Analysis ────────────────────────────────── *)
 
-let classify_ports (ports : int array) : int array =
-  Array.map (fun p ->
-    if p < 1024 then 0
-    else if p < 49152 then 1
-    else 2
-  ) ports
+let count_open_ports data =
+  if Lazy.force ffi_available then Futhark_ffi.Scan.count_open_ports data
+  else Futhark_stubs.count_open_ports data
 
-let host_risk_scores (scan_results : int array array) (port_classes : int array) : float array =
-  let weights = [| 3.0; 1.0; 0.5 |] in
-  Array.map (fun row ->
-    let score = ref 0.0 in
-    Array.iteri (fun j s ->
-      if s = 1 && j < Array.length port_classes then
-        let cls = port_classes.(j) in
-        if cls >= 0 && cls < 3 then
-          score := !score +. weights.(cls)
-    ) row;
-    !score
-  ) scan_results
+let high_exposure_hosts data threshold =
+  if Lazy.force ffi_available then Futhark_ffi.Scan.high_exposure_hosts data threshold
+  else Futhark_stubs.high_exposure_hosts data threshold
 
-(* Stub: pattern matching *)
-let batch_pattern_count (files : string array) (pattern : string) : int array =
-  let plen = String.length pattern in
-  Array.map (fun file ->
-    let flen = String.length file in
-    if plen = 0 || plen > flen then 0
-    else begin
-      let count = ref 0 in
-      for i = 0 to flen - plen do
-        if String.sub file i plen = pattern then incr count
-      done;
-      !count
-    end
-  ) files
+let port_frequency data =
+  if Lazy.force ffi_available then Futhark_ffi.Scan.port_frequency data
+  else Futhark_stubs.port_frequency data
 
-(* Stub: network graph analysis *)
-let node_degrees (adj : bool array array) : int array =
-  Array.map (fun row ->
-    Array.fold_left (fun acc e -> if e then acc + 1 else acc) 0 row
-  ) adj
+let classify_ports ports =
+  if Lazy.force ffi_available then Futhark_ffi.Scan.classify_ports ports
+  else Futhark_stubs.classify_ports ports
 
-let graph_density (adj : bool array array) : float =
-  let n = Array.length adj in
-  let total = Array.fold_left (fun acc row ->
-    acc + Array.fold_left (fun a e -> if e then a + 1 else a) 0 row
-  ) 0 adj in
-  let max_edges = n * (n - 1) in
-  if max_edges = 0 then 0.0
-  else float_of_int total /. float_of_int max_edges
+let host_risk_scores data port_classes =
+  if Lazy.force ffi_available then Futhark_ffi.Scan.host_risk_scores data port_classes
+  else Futhark_stubs.host_risk_scores data port_classes
+
+(* ── Pattern Match ────────────────────────────────── *)
+
+let batch_pattern_count files pattern =
+  if Lazy.force ffi_available then Futhark_ffi.Pattern.batch_pattern_count files pattern
+  else Futhark_stubs.batch_pattern_count files pattern
+
+(* ── Network Graph ────────────────────────────────── *)
+
+let node_degrees adj =
+  if Lazy.force ffi_available then Futhark_ffi.Graph.node_degrees adj
+  else Futhark_stubs.node_degrees adj
+
+let graph_density adj =
+  if Lazy.force ffi_available then Futhark_ffi.Graph.graph_density adj
+  else Futhark_stubs.graph_density adj

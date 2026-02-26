@@ -35,7 +35,7 @@ let execute (args : Yojson.Safe.t) : (string, string) result =
         ("endpoints", `List (List.map (fun s -> `String s) lines));
         ("count", `Int (List.length lines));
       ] in
-      Ok (Yojson.Safe.to_string json)
+      Ok (Tool_output.wrap_result ~tool_name:"web_crawl" ~target:url res json)
     | Error e -> Error e
 
 let def : Tool_registry.tool_def = {
@@ -44,6 +44,7 @@ let def : Tool_registry.tool_def = {
   category = "WebSecurity";
   risk_level = Policy.Low;
   max_exec_secs = 300;
+  required_binary = Some "katana";
   input_schema = schema;
   execute;
 }

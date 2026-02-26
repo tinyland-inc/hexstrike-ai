@@ -46,9 +46,8 @@ let execute (args : Yojson.Safe.t) : (string, string) result =
         ("file", `String file);
         ("output_directory", `String output_dir);
         ("audit", `String (String.trim audit));
-        ("exit_code", `Int res.exit_code);
       ] in
-      Ok (Yojson.Safe.to_string json)
+      Ok (Tool_output.wrap_result ~tool_name:"file_carving" ~target:file res json)
     | Error e -> Error e
 
 let def : Tool_registry.tool_def = {
@@ -57,6 +56,7 @@ let def : Tool_registry.tool_def = {
   category = "Forensics";
   risk_level = Policy.Low;
   max_exec_secs = 600;
+  required_binary = Some "foremost";
   input_schema = schema;
   execute;
 }

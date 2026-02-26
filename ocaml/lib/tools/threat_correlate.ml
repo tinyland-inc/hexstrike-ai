@@ -55,7 +55,7 @@ let execute (args : Yojson.Safe.t) : (string, string) result =
       `Assoc [("name", `String n); ("category", `String c); ("severity", `String s)]
     ) analyzed));
   ] in
-  Ok (Yojson.Safe.to_string json)
+  Ok (Tool_output.wrap_pure ~tool_name:"threat_correlate" ~target json)
 
 let def : Tool_registry.tool_def = {
   name = "threat_correlate";
@@ -63,6 +63,7 @@ let def : Tool_registry.tool_def = {
   category = "Intelligence";
   risk_level = Policy.Info;
   max_exec_secs = 10;
+  required_binary = None;
   input_schema = schema;
   execute;
 }

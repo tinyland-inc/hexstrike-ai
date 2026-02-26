@@ -27,8 +27,8 @@ let execute (args : Yojson.Safe.t) : (string, string) result =
     let argv = ["nmap"] @ flag_parts @ ["-oX"; "-"; target] in
     match Subprocess.run_safe ~timeout_secs:600 argv with
     | Ok res ->
-      if res.exit_code = 0 then Ok res.stdout
-      else Error (Printf.sprintf "nmap exited %d: %s" res.exit_code res.stdout)
+      if res.exit_code = 0 then Ok (Tool_output.wrap_json ~tool_name:"nmap_scan" ~target res)
+      else Ok (Tool_output.wrap_error ~tool_name:"nmap_scan" ~target res)
     | Error e -> Error e
 
 let def : Tool_registry.tool_def = {
@@ -37,6 +37,7 @@ let def : Tool_registry.tool_def = {
   category = "NetworkRecon";
   risk_level = Policy.Medium;
   max_exec_secs = 600;
+  required_binary = Some "nmap";
   input_schema = schema;
   execute;
 }

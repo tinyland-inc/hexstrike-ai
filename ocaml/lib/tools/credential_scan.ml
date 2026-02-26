@@ -44,7 +44,7 @@ let execute (args : Yojson.Safe.t) : (string, string) result =
         ("matches_found", `Int (List.length findings));
         ("findings", `List (List.map (fun f -> `String f) findings));
       ] in
-      Ok (Yojson.Safe.to_string json)
+      Ok (Tool_output.wrap_result ~tool_name:"credential_scan" ~target res json)
     | Error e -> Error e
 
 let def : Tool_registry.tool_def = {
@@ -53,6 +53,7 @@ let def : Tool_registry.tool_def = {
   category = "CredentialAudit";
   risk_level = Policy.Low;
   max_exec_secs = 120;
+  required_binary = Some "grep";
   input_schema = schema;
   execute;
 }

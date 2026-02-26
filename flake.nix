@@ -31,9 +31,17 @@
         else
           pkgs.ocamlPackages;
 
+        # ── Futhark compiled kernels ──────────────────────────
+        # Each kernel is compiled to a separate shared library to avoid
+        # symbol collisions (all export futhark_context_new etc.)
+        # Source is in futhark/out/ (gitignored, built by CI futhark-build job).
+        # For local dev, the OCaml FFI bridge falls back to pure-OCaml stubs.
+        # Build locally: just futhark-build && just futhark-kernels
+        sharedLibExt = if pkgs.stdenv.hostPlatform.isDarwin then "dylib" else "so";
+
         # ── OCaml package dependencies ─────────────────────────
         ocamlDeps = with ocamlPkgs; [
-          findlib yojson cmdliner sha uuidm logs fmt
+          findlib yojson cmdliner sha uuidm logs fmt ctypes ctypes-foreign
         ];
         ocamlTestDeps = with ocamlPkgs; [ alcotest ];
 
@@ -222,6 +230,15 @@
           ] ++ securityTools;
 
           shellHook = ''
+            # Futhark kernels: set path if locally built
+            if [ -d "futhark/lib" ]; then
+              export FUTHARK_KERNEL_PATH="$PWD/futhark/lib"
+            '' + (if pkgs.stdenv.hostPlatform.isDarwin then ''
+              export DYLD_LIBRARY_PATH="$PWD/futhark/lib''${DYLD_LIBRARY_PATH:+:$DYLD_LIBRARY_PATH}"
+            '' else ''
+              export LD_LIBRARY_PATH="$PWD/futhark/lib''${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+            '') + ''
+            fi
             echo "hexstrike-dev shell ready"
             echo "  dhall     : $(dhall version 2>/dev/null || echo 'not found')"
             echo "  futhark   : $(futhark --version 2>/dev/null || echo 'not found')"

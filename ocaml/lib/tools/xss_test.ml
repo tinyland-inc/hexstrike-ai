@@ -31,16 +31,7 @@ let execute (args : Yojson.Safe.t) : (string, string) result =
                @ blind_args in
     match Subprocess.run_safe ~timeout_secs:300 argv with
     | Ok res ->
-      (try
-        let _ = Yojson.Safe.from_string res.stdout in
-        Ok res.stdout
-      with _ ->
-        let json = `Assoc [
-          ("url", `String url);
-          ("raw_output", `String (String.trim res.stdout));
-          ("exit_code", `Int res.exit_code);
-        ] in
-        Ok (Yojson.Safe.to_string json))
+      Ok (Tool_output.wrap_json ~tool_name:"xss_test" ~target:url res)
     | Error e -> Error e
 
 let def : Tool_registry.tool_def = {
@@ -49,6 +40,7 @@ let def : Tool_registry.tool_def = {
   category = "WebSecurity";
   risk_level = Policy.High;
   max_exec_secs = 300;
+  required_binary = Some "dalfox";
   input_schema = schema;
   execute;
 }

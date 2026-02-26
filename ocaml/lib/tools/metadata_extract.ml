@@ -21,15 +21,7 @@ let execute (args : Yojson.Safe.t) : (string, string) result =
     let argv = ["exiftool"; "-json"; file] in
     match Subprocess.run_safe ~timeout_secs:30 argv with
     | Ok res ->
-      (try
-        let _ = Yojson.Safe.from_string res.stdout in
-        Ok res.stdout
-      with _ ->
-        let json = `Assoc [
-          ("file", `String file);
-          ("raw_output", `String (String.trim res.stdout));
-        ] in
-        Ok (Yojson.Safe.to_string json))
+      Ok (Tool_output.wrap_json ~tool_name:"metadata_extract" ~target:file res)
     | Error e -> Error e
 
 let def : Tool_registry.tool_def = {
@@ -38,6 +30,7 @@ let def : Tool_registry.tool_def = {
   category = "Forensics";
   risk_level = Policy.Info;
   max_exec_secs = 30;
+  required_binary = Some "exiftool";
   input_schema = schema;
   execute;
 }

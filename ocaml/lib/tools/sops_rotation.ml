@@ -18,7 +18,7 @@ let execute (args : Yojson.Safe.t) : (string, string) result =
   let path = args |> member "path" |> to_string_option |> Option.value ~default:"." in
   let argv = ["sops"; "filestatus"; path] in
   match Subprocess.run_safe ~timeout_secs:30 argv with
-  | Ok res -> Ok res.stdout
+  | Ok res -> Ok (Tool_output.wrap_json ~tool_name:"sops_rotation_check" ~target:path res)
   | Error e -> Error e
 
 let def : Tool_registry.tool_def = {
@@ -27,6 +27,7 @@ let def : Tool_registry.tool_def = {
   category = "CredentialAudit";
   risk_level = Policy.Low;
   max_exec_secs = 30;
+  required_binary = Some "sops";
   input_schema = schema;
   execute;
 }

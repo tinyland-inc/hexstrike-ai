@@ -49,7 +49,13 @@ let execute (args : Yojson.Safe.t) : (string, string) result =
             ("data", `Null);
           ]));
     ] in
-    Ok (Yojson.Safe.to_string json)
+    let res = match extract_result with
+      | Ok r -> r
+      | Error _ -> match info_result with
+        | Ok r -> r
+        | Error _ -> { Subprocess.stdout = ""; stderr = ""; exit_code = 1; duration_ms = 0; timed_out = false }
+    in
+    Ok (Tool_output.wrap_result ~tool_name:"steganography" ~target:file res json)
 
 let def : Tool_registry.tool_def = {
   name = "steganography";
@@ -57,6 +63,7 @@ let def : Tool_registry.tool_def = {
   category = "Forensics";
   risk_level = Policy.Low;
   max_exec_secs = 60;
+  required_binary = Some "steghide";
   input_schema = schema;
   execute;
 }

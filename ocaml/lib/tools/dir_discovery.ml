@@ -46,7 +46,7 @@ let execute (args : Yojson.Safe.t) : (string, string) result =
       ) found));
       ("checked", `Int (List.length default_paths));
     ] in
-    Ok (Yojson.Safe.to_string json)
+    Ok (Tool_output.wrap_pure ~tool_name:"dir_discovery" ~target:url json)
 
 let def : Tool_registry.tool_def = {
   name = "dir_discovery";
@@ -54,6 +54,7 @@ let def : Tool_registry.tool_def = {
   category = "WebSecurity";
   risk_level = Policy.Medium;
   max_exec_secs = 600;
+  required_binary = Some "curl";
   input_schema = schema;
   execute;
 }
