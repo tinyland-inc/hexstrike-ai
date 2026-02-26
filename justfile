@@ -52,6 +52,15 @@ futhark-build:
     futhark c --library -o futhark/out/network_graph futhark/network_graph.fut
     @echo ":: futhark OK"
 
+# Compile Futhark kernels to shared libraries for OCaml FFI
+futhark-kernels:
+    @echo ":: futhark kernels"
+    mkdir -p futhark/lib
+    cc -shared -fPIC -O2 -o futhark/lib/libscan_analysis.{{if os() == "macos" { "dylib" } else { "so" }}} futhark/out/scan_analysis.c -lm
+    cc -shared -fPIC -O2 -o futhark/lib/libpattern_match.{{if os() == "macos" { "dylib" } else { "so" }}} futhark/out/pattern_match.c -lm
+    cc -shared -fPIC -O2 -o futhark/lib/libnetwork_graph.{{if os() == "macos" { "dylib" } else { "so" }}} futhark/out/network_graph.c -lm
+    @echo ":: futhark kernels OK"
+
 # Check Futhark kernels typecheck
 futhark-check:
     @echo ":: futhark type-check"

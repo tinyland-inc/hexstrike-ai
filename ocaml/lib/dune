@@ -3,4 +3,4 @@
 (library
  (name hexstrike_lib)
  (wrapped false)
- (libraries unix yojson sha uuidm logs fmt))
+ (libraries unix yojson sha uuidm logs fmt ctypes ctypes.foreign))
