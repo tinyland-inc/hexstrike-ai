@@ -1,17 +1,28 @@
 # HexStrike-AI Tool Reference
 
-## Native Security Tools (Flask API on port 8888)
+## Security Tools (42 tools via OCaml MCP Server)
 
-HexStrike-AI exposes security tools via its Flask REST API:
+All security tools are dispatched through the Go gateway (`hexstrike-gateway` on port 8080), which enforces Dhall-compiled grants-as-capabilities policies. The OCaml MCP server (`hexstrike-mcp`) handles JSON-RPC 2.0 over stdio, sanitizes inputs via F*-proved sanitization, and maintains a hash-chain audit log.
 
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/api/command` | POST | Execute security commands (nmap, curl, etc.) |
-| `/api/intelligence/smart-scan` | POST | AI-driven scan with automatic tool selection |
-| `/api/intelligence/analyze-target` | POST | Target profiling and reconnaissance |
-| `/api/error-handling/execute-with-recovery` | POST | Commands with retry/recovery |
+### Tool Domains
 
-## Platform Tools via Adapter Proxy (51 total: 15 gateway + 36 Chapel)
+| Domain | Tools | Binary |
+|--------|-------|--------|
+| **WebSecurity** | `dir_discovery`, `vuln_scan`, `sqli_test`, `xss_test`, `waf_detect`, `web_crawl` | curl, nuclei, sqlmap, dalfox, wafw00f, katana |
+| **NetworkRecon** | `port_scan`, `host_discovery`, `nmap_scan`, `network_posture` | nmap |
+| **CloudSecurity** | `cloud_posture`, `container_vuln`, `iac_scan`, `k8s_audit` | trivy, kube-bench |
+| **CredentialAudit** | `credential_scan`, `sops_rotation`, `brute_force`, `hash_crack` | grep, sops, hydra, john |
+| **BinaryAnalysis** | `disassemble`, `debug_tool`, `gadget_search`, `firmware_analyze` | objdump, gdb, ROPgadget, binwalk |
+| **Forensics** | `memory_forensics`, `file_carving`, `steganography`, `metadata_extract` | vol, foremost, steghide, exiftool |
+| **SMBEnum** | `smb_enum`, `network_exec`, `rpc_enum` | smbclient, ssh, rpcclient |
+| **Intelligence** | `cve_monitor`, `exploit_gen`, `threat_correlate` | curl, searchsploit |
+| **APITesting** | `api_fuzz`, `graphql_scan`, `jwt_analyze` | ffuf, curl |
+| **DNSRecon** | `subdomain_enum`, `dns_recon` | subfinder, dig |
+| **Orchestration** | `smart_scan`, `analyze_target` | (composite) |
+| **Meta** | `server_health`, `execute_command` | (internal) |
+| **CryptoAnalysis** | `tls_check` | openssl |
+
+## Platform Tools via Adapter Proxy
 
 Platform tools provided by the adapter sidecar, proxied from rj-gateway.
 
@@ -115,7 +126,7 @@ Gateway endpoint: `http://rj-gateway.fuzzy-dev.svc.cluster.local:8080/mcp`
 - **Rate limits**: GitHub API has rate limits. Space out bulk fetches
 - **Tool timeouts**: MCP tools have a 30s default timeout
 - **Scope**: Only scan tinyland-inc infrastructure and authorized targets
-- **Credentials**: Never store raw credentials in findings — reference by name only
+- **Credentials**: Never store raw credentials in findings -- reference by name only
 
 ## Preferred Patterns
 
