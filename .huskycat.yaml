@@ -1,0 +1,28 @@
+# HuskyCat pre-commit validation hooks
+version: 1
+
+hooks:
+  pre-commit:
+    - name: dhall-typecheck
+      run: just dhall-check
+      files: "dhall/**/*.dhall"
+
+    - name: fstar-verify
+      run: just fstar-verify
+      files: "fstar/**/*.fst"
+
+    - name: futhark-check
+      run: just futhark-check
+      files: "futhark/**/*.fut"
+
+    - name: ocaml-build
+      run: just ocaml-build
+      files: "ocaml/**/*.ml"
+
+    - name: go-vet
+      run: cd gateway && go vet ./...
+      files: "gateway/**/*.go"
+
+    - name: policy-validate
+      run: dhall-to-json --file dhall/policies/validate.dhall > /dev/null
+      files: "dhall/policies/**/*.dhall"

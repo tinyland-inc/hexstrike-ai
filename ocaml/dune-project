@@ -1,0 +1,18 @@
+(lang dune 3.0)
+
+(name hexstrike-mcp)
+
+(generate_opam_files true)
+
+(package
+ (name hexstrike-mcp)
+ (synopsis "HexStrike MCP server — F*-verified cybersecurity tool dispatch")
+ (depends
+  (ocaml (>= 4.14))
+  (yojson (>= 2.0))
+  (cmdliner (>= 1.2))
+  (sha (>= 1.15))
+  (uuidm (>= 0.9))
+  (logs (>= 0.7))
+  (fmt (>= 0.9))
+  (alcotest :with-test)))

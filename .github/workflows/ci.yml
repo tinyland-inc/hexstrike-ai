@@ -1,0 +1,135 @@
+name: CI
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+    branches: [main, dev]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ── Stage 1: Validate ──────────────────────────────
+  dhall-check:
+    name: Dhall type-check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: DeterminateSystems/nix-installer-action@main
+      - uses: DeterminateSystems/magic-nix-cache-action@main
+      - run: nix develop --command just dhall-check
+
+  fstar-verify:
+    name: F* verification
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: DeterminateSystems/nix-installer-action@main
+      - uses: DeterminateSystems/magic-nix-cache-action@main
+      - run: nix develop .#fstar --command just fstar-verify
+
+  futhark-check:
+    name: Futhark type-check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: DeterminateSystems/nix-installer-action@main
+      - uses: DeterminateSystems/magic-nix-cache-action@main
+      - run: nix develop --command just futhark-check
+
+  go-vet:
+    name: Go vet
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: DeterminateSystems/nix-installer-action@main
+      - uses: DeterminateSystems/magic-nix-cache-action@main
+      - run: nix develop --command bash -c 'cd gateway && go vet ./...'
+
+  # ── Stage 2: Build ─────────────────────────────────
+  fstar-extract:
+    name: F* → OCaml extraction
+    needs: [fstar-verify]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: DeterminateSystems/nix-installer-action@main
+      - uses: DeterminateSystems/magic-nix-cache-action@main
+      - run: nix develop .#fstar --command just fstar-extract
+
+  futhark-build:
+    name: Futhark compile
+    needs: [futhark-check]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: DeterminateSystems/nix-installer-action@main
+      - uses: DeterminateSystems/magic-nix-cache-action@main
+      - run: nix develop --command just futhark-build
+
+  ocaml-build:
+    name: OCaml build
+    needs: [dhall-check]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: DeterminateSystems/nix-installer-action@main
+      - uses: DeterminateSystems/magic-nix-cache-action@main
+      - run: nix develop --command just ocaml-build
+
+  gateway-build:
+    name: Gateway build
+    needs: [go-vet]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: DeterminateSystems/nix-installer-action@main
+      - uses: DeterminateSystems/magic-nix-cache-action@main
+      - run: nix develop --command bash -c 'cd gateway && go build ./...'
+
+  policy-compile:
+    name: Policy compile
+    needs: [dhall-check]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: DeterminateSystems/nix-installer-action@main
+      - uses: DeterminateSystems/magic-nix-cache-action@main
+      - run: nix develop --command just dhall-render
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tool-manifest
+          path: dhall/out/tool-manifest.json
+
+  # ── Stage 3: Test ──────────────────────────────────
+  unit-test:
+    name: Unit tests
+    needs: [ocaml-build]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: DeterminateSystems/nix-installer-action@main
+      - uses: DeterminateSystems/magic-nix-cache-action@main
+      - run: nix develop --command just ocaml-test
+
+  integration-test:
+    name: Integration tests
+    needs: [ocaml-build]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: DeterminateSystems/nix-installer-action@main
+      - uses: DeterminateSystems/magic-nix-cache-action@main
+      - run: nix develop --command bash -c 'dune build --root ocaml && bash test/integration/test_mcp_roundtrip.sh ocaml/_build/default/bin/main.exe'
+
+  gateway-test:
+    name: Gateway tests
+    needs: [gateway-build]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: DeterminateSystems/nix-installer-action@main
+      - uses: DeterminateSystems/magic-nix-cache-action@main
+      - run: nix develop --command bash -c 'cd gateway && go test ./...'

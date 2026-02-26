@@ -1,0 +1,67 @@
+# Nix
+result
+result-*
+.direnv/
+
+# OCaml
+ocaml/_build/
+*.byte
+*.native
+*.install
+
+# F*
+fstar/*.checked
+fstar/*.ml
+fstar/out/
+fstar/.depend
+fstar/cache/
+
+# Futhark
+futhark/*.c
+futhark/*.h
+futhark/*.json
+futhark/out/
+futhark/scan_analysis
+futhark/pattern_match
+futhark/network_graph
+
+# Dhall
+.dhall/
+dhall/.cache/
+dhall/out/
+
+# Python legacy
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.venv/
+venv/
+
+# Secrets / credentials
+.env
+.env.*
+*.pem
+*.key
+credentials.json
+secrets.yaml
+*.kdbx
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Build artifacts
+/build/
+/dist/
+/target/
+
+# Results (runtime output)
+/results/
+
+# Go
+gateway/hexstrike-gateway
