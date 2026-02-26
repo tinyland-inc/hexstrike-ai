@@ -1,11 +1,10 @@
-# Build and push container image to GHCR on main branch pushes.
-# Copy this to .github/workflows/ghcr.yml in each agent repo.
+# Build and push Nix-built container image to GHCR on main branch pushes.
+# For repos that use `nix build .#container` instead of Dockerfile.
 #
 # Tags:
 #   sha-<commit>  — immutable, Renovate tracks these
 #   edge          — rolling latest from main branch
 #   latest        — alias for edge on main
-#   v*            — semver release tags
 #
 # Usage:
 #   1. Copy to repo's .github/workflows/ghcr.yml
@@ -16,13 +15,11 @@ name: GHCR Build
 on:
   push:
     branches: [main]
-    tags: ['v*']
   workflow_dispatch:
 
 env:
   REGISTRY: ghcr.io
   OWNER: tinyland-inc
-  # Change this per repo: ironclaw, picoclaw, or hexstrike-ai
   REPO_NAME: hexstrike-ai
 
 permissions:
@@ -37,8 +34,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+      - name: Install Nix
+        uses: cachix/install-nix-action@v30
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+
+      - name: Build container image
+        run: nix build .#container --print-build-logs
 
       - name: Log in to GHCR
         uses: docker/login-action@v3
@@ -47,24 +49,23 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract metadata
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.OWNER }}/${{ env.REPO_NAME }}
-          tags: |
-            type=sha,prefix=sha-,format=short
-            type=edge,branch=main
-            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
-            type=semver,pattern=v{{version}}
+      - name: Load and tag image
+        run: |
+          # Nix produces a tarball at ./result
+          docker load < ./result
 
-      - name: Build and push
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          platforms: linux/amd64
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          # The image is tagged as defined in flake.nix (usually <name>:edge)
+          SOURCE="${{ env.REGISTRY }}/${{ env.OWNER }}/${{ env.REPO_NAME }}:edge"
+          SHA_SHORT=$(echo "${{ github.sha }}" | cut -c1-7)
+
+          # Tag with sha, edge, and latest
+          docker tag "$SOURCE" "${{ env.REGISTRY }}/${{ env.OWNER }}/${{ env.REPO_NAME }}:sha-${SHA_SHORT}"
+          docker tag "$SOURCE" "${{ env.REGISTRY }}/${{ env.OWNER }}/${{ env.REPO_NAME }}:edge"
+          docker tag "$SOURCE" "${{ env.REGISTRY }}/${{ env.OWNER }}/${{ env.REPO_NAME }}:latest"
+
+      - name: Push all tags
+        run: |
+          SHA_SHORT=$(echo "${{ github.sha }}" | cut -c1-7)
+          docker push "${{ env.REGISTRY }}/${{ env.OWNER }}/${{ env.REPO_NAME }}:sha-${SHA_SHORT}"
+          docker push "${{ env.REGISTRY }}/${{ env.OWNER }}/${{ env.REPO_NAME }}:edge"
+          docker push "${{ env.REGISTRY }}/${{ env.OWNER }}/${{ env.REPO_NAME }}:latest"

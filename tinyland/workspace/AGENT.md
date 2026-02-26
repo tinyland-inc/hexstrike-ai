@@ -35,18 +35,13 @@ __findings__[
 
 ## Available Tools
 
-### Security Tools (42 via MCP protocol)
-Native tools dispatched through the Go gateway to the OCaml MCP server:
-- `smart_scan` -- AI-driven scan with automatic tool selection
-- `target_profile` -- multi-phase reconnaissance and profiling
-- `port_scan`, `nmap_scan`, `host_discovery` -- network recon
-- `tls_check` -- TLS/SSL verification
-- `credential_scan`, `sops_rotation_check` -- credential auditing
-- `container_scan`, `k8s_audit` -- cloud/container security
-- `vuln_scan`, `sqli_test`, `xss_test` -- web security
-- See TOOLS.md for the full 42-tool inventory
+### Security Tools (Flask API)
+- `/api/command` -- execute security commands (nmap, curl, etc.)
+- `/api/intelligence/smart-scan` -- AI-driven scan with automatic tool selection
+- `/api/intelligence/analyze-target` -- target profiling and reconnaissance
+- `/api/error-handling/execute-with-recovery` -- commands with retry/recovery
 
-### Platform Tools (via adapter sidecar)
+### Platform Tools (via adapter)
 - `juggler_resolve_composite` -- resolve credentials from multiple sources
 - `juggler_setec_list` / `juggler_setec_get` / `juggler_setec_put` -- secret store
 - `juggler_audit_log` -- query audit trail
