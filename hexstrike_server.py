@@ -31,8 +31,15 @@ log = logging.getLogger("hexstrike")
 
 # Allowed security tool binaries (whitelist).
 ALLOWED_TOOLS = {
-    "nmap", "curl", "git", "ssh-keyscan", "openssl",
-    "dig", "host", "wget", "nc",
+    "nmap",
+    "curl",
+    "git",
+    "ssh-keyscan",
+    "openssl",
+    "dig",
+    "host",
+    "wget",
+    "nc",
 }
 
 # Built-in scan commands mapped to Python functions.
@@ -41,15 +48,18 @@ BUILTIN_COMMANDS = {}
 
 def register_command(name):
     """Decorator to register a built-in scan command."""
+
     def decorator(fn):
         BUILTIN_COMMANDS[name] = fn
         return fn
+
     return decorator
 
 
 # ---------------------------------------------------------------------------
 # Built-in security scan commands
 # ---------------------------------------------------------------------------
+
 
 @register_command("credential_scan")
 def cmd_credential_scan(args):
@@ -74,11 +84,17 @@ def cmd_credential_scan(args):
     try:
         result = subprocess.run(
             ["git", "clone", "--depth=1", f"https://github.com/{target}.git", tmp_dir],
-            capture_output=True, text=True, timeout=60
+            capture_output=True,
+            text=True,
+            timeout=60,
         )
         if result.returncode != 0:
             stdout_lines.append(f"Clone failed: {result.stderr.strip()}")
-            return {"success": False, "stdout": "\n".join(stdout_lines), "stderr": result.stderr}
+            return {
+                "success": False,
+                "stdout": "\n".join(stdout_lines),
+                "stderr": result.stderr,
+            }
 
         files_scanned = 0
         for root, _, files in os.walk(tmp_dir):
@@ -97,13 +113,15 @@ def cmd_credential_scan(args):
                     for i, line in enumerate(content.splitlines(), 1):
                         for pattern in patterns:
                             if re.search(pattern, line):
-                                findings.append({
-                                    "title": f"Potential credential in {rel_path}:{i}",
-                                    "body": f"Pattern match in `{rel_path}` line {i}. Review and rotate if real.",
-                                    "severity": "high",
-                                    "labels": ["security", "credentials"],
-                                    "fingerprint": f"cred-{rel_path}-{i}",
-                                })
+                                findings.append(
+                                    {
+                                        "title": f"Potential credential in {rel_path}:{i}",
+                                        "body": f"Pattern match in `{rel_path}` line {i}. Review and rotate if real.",
+                                        "severity": "high",
+                                        "labels": ["security", "credentials"],
+                                        "fingerprint": f"cred-{rel_path}-{i}",
+                                    }
+                                )
                 except (OSError, UnicodeDecodeError):
                     continue
 
@@ -139,21 +157,21 @@ def cmd_tls_check(args):
     stdout_lines = [f"Checking TLS for {target}..."]
 
     try:
-        result = subprocess.run(
-            ["openssl", "s_client", "-connect", target, "-servername", host],
-            input="", capture_output=True, text=True, timeout=15
-        )
-        cert_text = result.stdout
-
         # Check expiry
         result2 = subprocess.run(
             ["openssl", "s_client", "-connect", target, "-servername", host],
-            input="", capture_output=True, text=True, timeout=15
+            input="",
+            capture_output=True,
+            text=True,
+            timeout=15,
         )
         # Parse certificate dates
         dates_result = subprocess.run(
             ["openssl", "x509", "-noout", "-dates"],
-            input=result2.stdout, capture_output=True, text=True, timeout=5
+            input=result2.stdout,
+            capture_output=True,
+            text=True,
+            timeout=5,
         )
         stdout_lines.append(dates_result.stdout.strip())
 
@@ -161,16 +179,21 @@ def cmd_tls_check(args):
         for proto in ["ssl3", "tls1", "tls1_1"]:
             weak_check = subprocess.run(
                 ["openssl", "s_client", "-connect", target, f"-{proto}"],
-                input="", capture_output=True, text=True, timeout=10
+                input="",
+                capture_output=True,
+                text=True,
+                timeout=10,
             )
             if weak_check.returncode == 0 and "CONNECTED" in weak_check.stdout:
-                findings.append({
-                    "title": f"Weak TLS protocol {proto} supported on {host}",
-                    "body": f"Host {host} accepts {proto} connections. Disable legacy protocols.",
-                    "severity": "medium",
-                    "labels": ["security", "tls"],
-                    "fingerprint": f"tls-weak-{host}-{proto}",
-                })
+                findings.append(
+                    {
+                        "title": f"Weak TLS protocol {proto} supported on {host}",
+                        "body": f"Host {host} accepts {proto} connections. Disable legacy protocols.",
+                        "severity": "medium",
+                        "labels": ["security", "tls"],
+                        "fingerprint": f"tls-weak-{host}-{proto}",
+                    }
+                )
 
         stdout_lines.append(f"TLS check complete for {host}")
     except subprocess.TimeoutExpired:
@@ -197,12 +220,23 @@ def cmd_port_scan(args):
     try:
         result = subprocess.run(
             ["nmap", "-Pn", "-p", ports, "--open", "-oG", "-", target],
-            capture_output=True, text=True, timeout=120
+            capture_output=True,
+            text=True,
+            timeout=120,
         )
         stdout = f"Port scan of {target}:\n{result.stdout}"
-        return {"success": True, "stdout": stdout, "stderr": result.stderr, "execution_time": 0}
+        return {
+            "success": True,
+            "stdout": stdout,
+            "stderr": result.stderr,
+            "execution_time": 0,
+        }
     except subprocess.TimeoutExpired:
-        return {"success": False, "stdout": f"Scan of {target} timed out", "stderr": "timeout"}
+        return {
+            "success": False,
+            "stdout": f"Scan of {target} timed out",
+            "stderr": "timeout",
+        }
     except FileNotFoundError:
         return {"error": "nmap not found"}
 
@@ -224,13 +258,23 @@ def cmd_network_posture(args):
     for name, host, port in services:
         try:
             result = subprocess.run(
-                ["curl", "-s", "-o", "/dev/null", "-w", "%{http_code}", f"http://{host}:{port}/health"],
-                capture_output=True, text=True, timeout=5
+                [
+                    "curl",
+                    "-s",
+                    "-o",
+                    "/dev/null",
+                    "-w",
+                    "%{http_code}",
+                    f"http://{host}:{port}/health",
+                ],
+                capture_output=True,
+                text=True,
+                timeout=5,
             )
             status = result.stdout.strip()
             stdout_lines.append(f"  {name}: HTTP {status}")
             if status == "000":
-                stdout_lines.append(f"    -> unreachable")
+                stdout_lines.append("    -> unreachable")
         except (subprocess.TimeoutExpired, FileNotFoundError):
             stdout_lines.append(f"  {name}: timeout/error")
 
@@ -250,26 +294,30 @@ def cmd_container_vuln(args):
     # Check if running as root
     uid = os.getuid()
     if uid == 0:
-        findings.append({
-            "title": "Container running as root",
-            "body": "This container is running as UID 0. Use a non-root user.",
-            "severity": "medium",
-            "labels": ["security", "container"],
-            "fingerprint": "container-root-uid",
-        })
+        findings.append(
+            {
+                "title": "Container running as root",
+                "body": "This container is running as UID 0. Use a non-root user.",
+                "severity": "medium",
+                "labels": ["security", "container"],
+                "fingerprint": "container-root-uid",
+            }
+        )
     stdout_lines.append(f"  Running as UID: {uid}")
 
     # Check for writable sensitive paths
     sensitive_paths = ["/etc/passwd", "/etc/shadow", "/proc/sysrq-trigger"]
     for path in sensitive_paths:
         if os.path.exists(path) and os.access(path, os.W_OK):
-            findings.append({
-                "title": f"Writable sensitive path: {path}",
-                "body": f"Container has write access to {path}. This is a security risk.",
-                "severity": "high",
-                "labels": ["security", "container"],
-                "fingerprint": f"container-writable-{path.replace('/', '-')}",
-            })
+            findings.append(
+                {
+                    "title": f"Writable sensitive path: {path}",
+                    "body": f"Container has write access to {path}. This is a security risk.",
+                    "severity": "high",
+                    "labels": ["security", "container"],
+                    "fingerprint": f"container-writable-{path.replace('/', '-')}",
+                }
+            )
             stdout_lines.append(f"  {path}: WRITABLE (risk)")
         else:
             stdout_lines.append(f"  {path}: ok")
@@ -293,7 +341,7 @@ def cmd_container_vuln(args):
 @register_command("sops_rotation_check")
 def cmd_sops_rotation_check(args):
     """Check SOPS key rotation status."""
-    target = _parse_arg(args, "--target")
+    _parse_arg(args, "--target")  # reserved for future filtering
     findings = []
     stdout_lines = ["SOPS key rotation check..."]
 
@@ -305,13 +353,15 @@ def cmd_sops_rotation_check(args):
     stdout_lines.append(f"  age binary: {'found' if age_path else 'NOT FOUND'}")
 
     if not sops_path:
-        findings.append({
-            "title": "SOPS binary not available",
-            "body": "The sops binary is not installed. SOPS key rotation cannot be verified.",
-            "severity": "low",
-            "labels": ["security", "sops"],
-            "fingerprint": "sops-missing-binary",
-        })
+        findings.append(
+            {
+                "title": "SOPS binary not available",
+                "body": "The sops binary is not installed. SOPS key rotation cannot be verified.",
+                "severity": "low",
+                "labels": ["security", "sops"],
+                "fingerprint": "sops-missing-binary",
+            }
+        )
 
     stdout = "\n".join(stdout_lines)
     if findings:
@@ -324,6 +374,7 @@ def cmd_sops_rotation_check(args):
 # Flask routes
 # ---------------------------------------------------------------------------
 
+
 @app.route("/health", methods=["GET"])
 def health():
     """Health check: verify tool availability."""
@@ -333,12 +384,14 @@ def health():
 
     builtins = list(BUILTIN_COMMANDS.keys())
 
-    return jsonify({
-        "status": "ok",
-        "agent": "hexstrike-ai",
-        "tools": tools,
-        "builtin_commands": builtins,
-    })
+    return jsonify(
+        {
+            "status": "ok",
+            "agent": "hexstrike-ai",
+            "tools": tools,
+            "builtin_commands": builtins,
+        }
+    )
 
 
 @app.route("/api/command", methods=["POST"])
@@ -379,23 +432,25 @@ def api_command():
     # Execute external tool
     try:
         argv = command_str.split()
-        result = subprocess.run(
-            argv, capture_output=True, text=True, timeout=300
-        )
+        result = subprocess.run(argv, capture_output=True, text=True, timeout=300)
         elapsed = time.time() - start
-        return jsonify({
-            "success": result.returncode == 0,
-            "stdout": result.stdout,
-            "stderr": result.stderr,
-            "execution_time": round(elapsed, 2),
-        })
+        return jsonify(
+            {
+                "success": result.returncode == 0,
+                "stdout": result.stdout,
+                "stderr": result.stderr,
+                "execution_time": round(elapsed, 2),
+            }
+        )
     except subprocess.TimeoutExpired:
-        return jsonify({
-            "success": False,
-            "stdout": "",
-            "stderr": f"Command timed out after 300s",
-            "execution_time": 300,
-        })
+        return jsonify(
+            {
+                "success": False,
+                "stdout": "",
+                "stderr": "Command timed out after 300s",
+                "execution_time": 300,
+            }
+        )
     except FileNotFoundError:
         return jsonify({"error": f"tool not found: {cmd_name}"}), 400
 
@@ -410,22 +465,30 @@ def smart_scan():
     # Run relevant built-in scans based on target type
     if "/" in target:
         # Looks like a repo — run credential scan
-        r = BUILTIN_COMMANDS.get("credential_scan", lambda a: {"stdout": "no scanner"})(f"--target {target}")
+        r = BUILTIN_COMMANDS.get("credential_scan", lambda a: {"stdout": "no scanner"})(
+            f"--target {target}"
+        )
         results.append(r)
     else:
         # Looks like a host — run port scan + TLS check
-        r = BUILTIN_COMMANDS.get("port_scan", lambda a: {"stdout": "no scanner"})(f"--target {target}")
+        r = BUILTIN_COMMANDS.get("port_scan", lambda a: {"stdout": "no scanner"})(
+            f"--target {target}"
+        )
         results.append(r)
-        r = BUILTIN_COMMANDS.get("tls_check", lambda a: {"stdout": "no scanner"})(f"--target {target}")
+        r = BUILTIN_COMMANDS.get("tls_check", lambda a: {"stdout": "no scanner"})(
+            f"--target {target}"
+        )
         results.append(r)
 
     combined_stdout = "\n".join(r.get("stdout", "") for r in results)
-    return jsonify({
-        "success": True,
-        "stdout": combined_stdout,
-        "stderr": "",
-        "scans_run": len(results),
-    })
+    return jsonify(
+        {
+            "success": True,
+            "stdout": combined_stdout,
+            "stderr": "",
+            "scans_run": len(results),
+        }
+    )
 
 
 @app.route("/api/intelligence/analyze-target", methods=["POST"])
@@ -450,16 +513,19 @@ def analyze_target():
         except (subprocess.TimeoutExpired, FileNotFoundError):
             stdout_lines.append("DNS: lookup failed")
 
-    return jsonify({
-        "success": True,
-        "stdout": "\n".join(stdout_lines),
-        "stderr": "",
-    })
+    return jsonify(
+        {
+            "success": True,
+            "stdout": "\n".join(stdout_lines),
+            "stderr": "",
+        }
+    )
 
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _parse_arg(args_str, flag):
     """Parse a --flag value from an argument string."""
@@ -468,13 +534,13 @@ def _parse_arg(args_str, flag):
         if p == flag and i + 1 < len(parts):
             return parts[i + 1]
         if p.startswith(f"{flag}="):
-            return p[len(flag) + 1:]
+            return p[len(flag) + 1 :]
     return None
 
 
 def _has_shell_injection(cmd):
     """Check for shell injection metacharacters."""
-    return bool(re.search(r'[;&|`$(){}]', cmd))
+    return bool(re.search(r"[;&|`$(){}]", cmd))
 
 
 def _is_binary(filepath):
