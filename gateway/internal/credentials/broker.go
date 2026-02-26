@@ -11,6 +11,7 @@ package credentials
 import (
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 	"os/exec"
 	"strings"
@@ -56,6 +57,16 @@ func NewBrokerWithConfig(cfg BrokerConfig) *Broker {
 	}
 
 	return &Broker{resolvers: resolvers}
+}
+
+// SetSetecClient replaces the Setec resolver's HTTP client (e.g., with a
+// tsnet-authenticated client for Tailscale-native identity).
+func (b *Broker) SetSetecClient(client *http.Client) {
+	for _, r := range b.resolvers {
+		if sr, ok := r.(*SetecResolver); ok {
+			sr.HTTPClient = client
+		}
+	}
 }
 
 // Resolve tries each resolver in order until one succeeds.

@@ -72,7 +72,7 @@ let match_namespace (dst : string) (caller : string) =
     match dst with
     | "internal" -> is_tailnet
     | "external" -> not is_tailnet
-    | _ -> dst = "*"
+    | _ -> dst = caller
 
 let default_compiled = { grants = []; denied = []; version = "default-allow" }
 

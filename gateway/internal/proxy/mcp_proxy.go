@@ -10,6 +10,8 @@ import (
 	"log"
 	"os/exec"
 	"sync"
+
+	"github.com/tinyland-inc/hexstrike-ai/gateway/internal/credentials"
 )
 
 // MCPProxy manages a subprocess running the F*-extracted MCP server.
@@ -19,6 +21,7 @@ type MCPProxy struct {
 	stdout *bufio.Reader
 	mu     sync.Mutex
 	nextID int
+	broker *credentials.Broker
 }
 
 // NewMCPProxy starts the MCP server binary as a subprocess.
@@ -120,6 +123,17 @@ func (p *MCPProxy) SendRequest(method string, params json.RawMessage) (json.RawM
 	}
 
 	return resp.Result, nil
+}
+
+// SetCredentialBroker attaches a credential broker for resolving
+// tool parameters that reference secrets.
+func (p *MCPProxy) SetCredentialBroker(b *credentials.Broker) {
+	p.broker = b
+}
+
+// Broker returns the attached credential broker (may be nil).
+func (p *MCPProxy) Broker() *credentials.Broker {
+	return p.broker
 }
 
 // Alive reports whether the MCP subprocess is still running.

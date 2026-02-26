@@ -68,7 +68,6 @@ func main() {
 		KDBXEndpoint: *adapterURL,
 		SetecBaseURL: *setecURL,
 	})
-	_ = broker // available for tool parameter resolution
 
 	// Aperture metering (async, non-blocking)
 	metering := aperture.NewMeteringClient(*apertureURL)
@@ -76,11 +75,12 @@ func main() {
 		log.Printf("aperture metering enabled: %s", *apertureURL)
 	}
 
-	// Start MCP subprocess manager
+	// Start MCP subprocess manager with credential broker
 	mcpProxy, err := proxy.NewMCPProxy(*mcpBinary)
 	if err != nil {
 		log.Fatalf("failed to start MCP proxy: %v", err)
 	}
+	mcpProxy.SetCredentialBroker(broker)
 	defer mcpProxy.Stop()
 
 	// Metrics
@@ -144,6 +144,14 @@ func main() {
 			log.Fatalf("tsnet listen failed: %v", err)
 		}
 		log.Printf("tsnet listening as %s.tailnet", *tsHostname)
+
+		// Use tsnet-authenticated HTTP client for internal services
+		tsHTTPClient := tsServer.HTTPClient()
+		if *setecURL != "" {
+			broker.SetSetecClient(tsHTTPClient)
+			log.Printf("setec using tsnet-authenticated client")
+		}
+		metering.SetHTTPClient(tsHTTPClient)
 
 		// Also start HTTPS listener for TLS-enabled clients
 		go func() {

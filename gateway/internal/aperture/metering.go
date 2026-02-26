@@ -27,6 +27,14 @@ func NewMeteringClient(baseURL string) *MeteringClient {
 	}
 }
 
+// SetHTTPClient replaces the default HTTP client (e.g., with a
+// tsnet-authenticated client for Tailscale-native identity).
+func (c *MeteringClient) SetHTTPClient(client *http.Client) {
+	if client != nil {
+		c.HTTPClient = client
+	}
+}
+
 // UsageEvent represents a metering event for Aperture.
 type UsageEvent struct {
 	Caller    string    `json:"caller"`
