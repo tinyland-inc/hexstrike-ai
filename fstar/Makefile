@@ -16,10 +16,10 @@ extract: verify $(EXTRACTED)
 	@echo ":: F* -> OCaml extraction complete"
 
 cache/%.fst.checked: %.fst | cache
-	$(FSTAR) $(FSTAR_FLAGS) --verify_module $(basename $<) $<
+	$(FSTAR) $(FSTAR_FLAGS) $<
 
 out/Hexstrike_%.ml: Hexstrike.%.fst | out
-	$(FSTAR) $(FSTAR_FLAGS) --codegen OCaml --extract_module Hexstrike.$(word 2,$(subst ., ,$<)) $<
+	$(FSTAR) $(FSTAR_FLAGS) --codegen OCaml $<
 
 cache:
 	mkdir -p cache
