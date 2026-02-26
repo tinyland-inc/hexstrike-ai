@@ -9,6 +9,7 @@ let grants
     = [ { src = agents.campaign_runner
         , dst = ns.external
         , app = [ tools.port_scan
+                , tools.network_posture
                 , tools.tls_check
                 , tools.subdomain_enum
                 , tools.dns_recon
@@ -16,6 +17,8 @@ let grants
                 , tools.target_profile
                 , tools.credential_scan
                 , tools.vuln_scan
+                , tools.api_fuzz
+                , tools.cve_monitor
                 ]
         , parameter_constraints = [] : List { mapKey : Text, mapValue : Text }
         , rate_limit = 30
