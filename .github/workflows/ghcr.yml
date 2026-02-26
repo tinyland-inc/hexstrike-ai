@@ -1,5 +1,4 @@
-# Build and push container image to GHCR on main branch pushes.
-# Copy this to .github/workflows/ghcr.yml in each agent repo.
+# Build OCI container via Nix and push to GHCR on main branch pushes.
 #
 # Tags:
 #   sha-<commit>  — immutable, Renovate tracks these
@@ -7,10 +6,8 @@
 #   latest        — alias for edge on main
 #   v*            — semver release tags
 #
-# Usage:
-#   1. Copy to repo's .github/workflows/ghcr.yml
-#   2. Update REPO_NAME env var
-#   3. Push to main branch
+# The container is built by `nix build .#container` (dockerTools.buildLayeredImage)
+# and pushed via skopeo. No Dockerfile needed.
 name: GHCR Build
 
 on:
@@ -21,9 +18,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  OWNER: tinyland-inc
-  # Change this per repo: ironclaw, picoclaw, or hexstrike-ai
-  REPO_NAME: hexstrike-ai
+  IMAGE: ghcr.io/tinyland-inc/hexstrike-ai
 
 permissions:
   contents: read
@@ -37,8 +32,14 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@main
+
+      - name: Nix cache
+        uses: DeterminateSystems/magic-nix-cache-action@main
+
+      - name: Build OCI image
+        run: nix build .#container
 
       - name: Log in to GHCR
         uses: docker/login-action@v3
@@ -47,24 +48,48 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract metadata
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.OWNER }}/${{ env.REPO_NAME }}
-          tags: |
-            type=sha,prefix=sha-,format=short
-            type=edge,branch=main
-            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
-            type=semver,pattern=v{{version}}
+      - name: Compute tags
+        id: tags
+        run: |
+          SHA_SHORT=$(echo "${{ github.sha }}" | cut -c1-7)
+          echo "sha_tag=sha-${SHA_SHORT}" >> "$GITHUB_OUTPUT"
 
-      - name: Build and push
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          platforms: linux/amd64
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+            echo "version_tag=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Push image
+        run: |
+          # Load into docker daemon
+          docker load < result
+
+          # Find the loaded image name
+          LOADED=$(docker images --format '{{.Repository}}:{{.Tag}}' | head -1)
+
+          # Tag and push: sha tag (immutable)
+          docker tag "$LOADED" "${{ env.IMAGE }}:${{ steps.tags.outputs.sha_tag }}"
+          docker push "${{ env.IMAGE }}:${{ steps.tags.outputs.sha_tag }}"
+
+          # Tag and push: edge (rolling)
+          docker tag "$LOADED" "${{ env.IMAGE }}:edge"
+          docker push "${{ env.IMAGE }}:edge"
+
+          # Tag and push: latest (on main)
+          if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+            docker tag "$LOADED" "${{ env.IMAGE }}:latest"
+            docker push "${{ env.IMAGE }}:latest"
+          fi
+
+          # Tag and push: semver (on tag)
+          if [[ -n "${{ steps.tags.outputs.version_tag }}" ]]; then
+            docker tag "$LOADED" "${{ env.IMAGE }}:${{ steps.tags.outputs.version_tag }}"
+            docker push "${{ env.IMAGE }}:${{ steps.tags.outputs.version_tag }}"
+          fi
+
+      - name: Summary
+        run: |
+          echo "### Container pushed" >> "$GITHUB_STEP_SUMMARY"
+          echo "- \`${{ env.IMAGE }}:${{ steps.tags.outputs.sha_tag }}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- \`${{ env.IMAGE }}:edge\`" >> "$GITHUB_STEP_SUMMARY"
+          SIZE=$(du -h result | cut -f1)
+          echo "- Image size: ${SIZE}" >> "$GITHUB_STEP_SUMMARY"
