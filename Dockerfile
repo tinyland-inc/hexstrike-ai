@@ -20,6 +20,10 @@ RUN apk add --no-cache \
     openssh-client \
     nmap \
     nmap-scripts \
+    openssl \
+    bind-tools \
+    wget \
+    netcat-openbsd \
     gcc \
     musl-dev \
     linux-headers \
