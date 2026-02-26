@@ -1,6 +1,6 @@
-(** Hash-chain audit log.
-    Each entry links to the previous via SHA-256, forming a tamper-evident chain.
-    Writes to /results/audit.jsonl (one JSON object per line). *)
+(** Hash-chain audit log — thin wrapper over verified Hexstrike_Audit.
+    Adds UUID generation, JSON serialization, and file I/O
+    on top of the F*-extracted verified hash-chain core. *)
 
 type decision =
   | Allowed
@@ -19,11 +19,39 @@ type entry = {
   entry_hash : string;
 }
 
-let genesis_hash =
-  String.make 64 '0'
+let genesis_hash = Hexstrike_Audit.genesis_hash
 
-let sha256_hex s =
-  Sha256.string s |> Sha256.to_hex
+let sha256_hex s = Hexstrike_Extern.sha256 s
+
+(** Convert local decision to F*-extracted decision type *)
+let to_fstar_decision = function
+  | Allowed -> Hexstrike_Types.Allowed
+  | Denied r -> Hexstrike_Types.Denied r
+
+(** Convert local risk string to F*-extracted severity *)
+let to_fstar_severity = function
+  | "Info" -> Hexstrike_Types.Info
+  | "Low" -> Hexstrike_Types.Low
+  | "Medium" -> Hexstrike_Types.Medium
+  | "High" -> Hexstrike_Types.High
+  | "Critical" -> Hexstrike_Types.Critical
+  | _ -> Hexstrike_Types.Info
+
+(** Convert F*-extracted audit entry back to local entry *)
+let of_fstar_entry (ae : Hexstrike_Audit.audit_entry) ~risk_level_str : entry = {
+  entry_id = ae.ae_entry_id;
+  previous_hash = ae.ae_previous_hash;
+  timestamp = ae.ae_timestamp;
+  caller = ae.ae_caller;
+  tool_name = ae.ae_tool_name;
+  decision = (match ae.ae_decision with
+    | Hexstrike_Types.Allowed -> Allowed
+    | Hexstrike_Types.Denied r -> Denied r);
+  risk_level = risk_level_str;
+  duration_ms = ae.ae_duration_ms;
+  result_summary = ae.ae_result;
+  entry_hash = ae.ae_entry_hash;
+}
 
 let entry_payload e =
   String.concat "|" [
@@ -63,6 +91,10 @@ let verify_entry e =
 
 let verify_chain_link ~prev ~curr =
   curr.previous_hash = prev.entry_hash && verify_entry curr
+
+(** Also verify using the F*-extracted verifier for double-check *)
+let verify_entry_fstar (ae : Hexstrike_Audit.audit_entry) : bool =
+  Hexstrike_Audit.verify_entry ae
 
 let entry_to_json e : Yojson.Safe.t =
   `Assoc [

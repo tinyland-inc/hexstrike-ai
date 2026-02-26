@@ -56,7 +56,13 @@ let test_server_health () =
   match result with
   | Ok output ->
     let json = Yojson.Safe.from_string output in
-    let status = Yojson.Safe.Util.(json |> member "status" |> to_string) in
+    let open Yojson.Safe.Util in
+    (* Envelope fields *)
+    Alcotest.(check string) "tool field" "server_health" (json |> member "tool" |> to_string);
+    Alcotest.(check int) "exitCode" 0 (json |> member "exitCode" |> to_int);
+    (* Data contains the actual health response *)
+    let data = json |> member "data" in
+    let status = data |> member "status" |> to_string in
     Alcotest.(check string) "health ok" "ok" status
   | Error e -> Alcotest.fail ("health failed: " ^ e)
 
@@ -233,6 +239,170 @@ let test_futhark_density () =
   (* 4 edges out of 6 possible = 0.667 *)
   Alcotest.(check bool) "density ~0.67" true (d > 0.6 && d < 0.7)
 
+(* ── Subprocess Stderr ─────────────────────────────── *)
+
+let test_subprocess_stderr () =
+  (* ls on a nonexistent path writes error to stderr, stdout is empty *)
+  let res = Subprocess.run ~timeout_secs:5 ["ls"; "/nonexistent-path-for-test"] in
+  Alcotest.(check bool) "non-zero exit" true (res.exit_code <> 0);
+  Alcotest.(check bool) "stderr non-empty" true (String.length res.stderr > 0);
+  (* Before W1A fix, stderr was always "" — now it has the error message *)
+  Alcotest.(check bool) "stderr has content" true
+    (String.length (String.trim res.stderr) > 0)
+
+(* ── Binary Check ─────────────────────────────────── *)
+
+let test_binary_check () =
+  Tool_init.register_all ();
+  (* server_health has required_binary = None, should be in registry *)
+  let sh = Tool_registry.find "server_health" in
+  Alcotest.(check bool) "server_health registered" true (Option.is_some sh);
+  let tool = Option.get sh in
+  Alcotest.(check bool) "no required binary" true (tool.required_binary = None);
+  (* port_scan has required_binary = Some "nmap" *)
+  let ps = Tool_registry.find "port_scan" in
+  Alcotest.(check bool) "port_scan registered" true (Option.is_some ps);
+  let ptool = Option.get ps in
+  Alcotest.(check bool) "nmap required" true (ptool.required_binary = Some "nmap")
+
+(* ── Output Envelope ──────────────────────────────── *)
+
+let test_output_envelope () =
+  let res : Subprocess.exec_result = {
+    exit_code = 0; stdout = "{\"key\":\"val\"}";
+    stderr = "some warning"; duration_ms = 42; timed_out = false;
+  } in
+  let output = Tool_output.wrap_json ~tool_name:"test_tool" ~target:"127.0.0.1" res in
+  let json = Yojson.Safe.from_string output in
+  let open Yojson.Safe.Util in
+  Alcotest.(check string) "tool" "test_tool" (json |> member "tool" |> to_string);
+  Alcotest.(check string) "target" "127.0.0.1" (json |> member "target" |> to_string);
+  Alcotest.(check int) "exitCode" 0 (json |> member "exitCode" |> to_int);
+  Alcotest.(check int) "durationMs" 42 (json |> member "durationMs" |> to_int);
+  Alcotest.(check string) "stderr" "some warning" (json |> member "stderr" |> to_string);
+  (* data should be parsed JSON, not a string *)
+  let data = json |> member "data" in
+  Alcotest.(check string) "data.key" "val" (data |> member "key" |> to_string)
+
+let test_output_envelope_error () =
+  let res : Subprocess.exec_result = {
+    exit_code = 1; stdout = "command not found";
+    stderr = "error details"; duration_ms = 5; timed_out = false;
+  } in
+  let output = Tool_output.wrap_error ~tool_name:"test_tool" ~target:"target" res in
+  let json = Yojson.Safe.from_string output in
+  let open Yojson.Safe.Util in
+  Alcotest.(check int) "exitCode" 1 (json |> member "exitCode" |> to_int);
+  let data = json |> member "data" in
+  Alcotest.(check bool) "error flag" true (data |> member "error" |> to_bool)
+
+let test_output_envelope_pure () =
+  let data = `Assoc [("status", `String "ok")] in
+  let output = Tool_output.wrap_pure ~tool_name:"test" ~target:"t" data in
+  let json = Yojson.Safe.from_string output in
+  let open Yojson.Safe.Util in
+  Alcotest.(check int) "exitCode" 0 (json |> member "exitCode" |> to_int);
+  Alcotest.(check string) "stderr empty" "" (json |> member "stderr" |> to_string);
+  Alcotest.(check string) "data.status" "ok"
+    (json |> member "data" |> member "status" |> to_string)
+
+(* ── Futhark FFI Fallback ──────────────────────────── *)
+
+let test_ffi_fallback () =
+  (* In test env, .so libs likely not available — stubs should be used *)
+  let data = [|
+    [| 1; 0; 1; 0 |];
+    [| 0; 0; 0; 0 |];
+    [| 1; 1; 1; 1 |];
+  |] in
+  (* Regardless of FFI availability, results should match stubs *)
+  let counts = Futhark_bridge.count_open_ports data in
+  Alcotest.(check (array int)) "fallback open counts" [| 2; 0; 4 |] counts;
+  let stub_counts = Futhark_stubs.count_open_ports data in
+  Alcotest.(check (array int)) "stub parity" stub_counts counts
+
+let test_ffi_stub_parity () =
+  let data = [|
+    [| 1; 1; 0; 0; 1 |];
+    [| 0; 1; 1; 0; 0 |];
+    [| 1; 1; 1; 1; 1 |];
+    [| 0; 0; 0; 0; 0 |];
+  |] in
+  let bridge = Futhark_bridge.count_open_ports data in
+  let stubs = Futhark_stubs.count_open_ports data in
+  Alcotest.(check (array int)) "count parity" stubs bridge;
+  let bridge_freq = Futhark_bridge.port_frequency data in
+  let stubs_freq = Futhark_stubs.port_frequency data in
+  Alcotest.(check (array int)) "frequency parity" stubs_freq bridge_freq;
+  let adj = [|
+    [| false; true;  false |];
+    [| true;  false; true  |];
+    [| false; true;  false |];
+  |] in
+  let bridge_deg = Futhark_bridge.node_degrees adj in
+  let stubs_deg = Futhark_stubs.node_degrees adj in
+  Alcotest.(check (array int)) "degree parity" stubs_deg bridge_deg
+
+(* ── F* Extraction Parity ─────────────────────────── *)
+
+let test_fstar_sanitize_parity () =
+  (* Verified core returns option, hand-written returns result — should agree *)
+  let clean = "192.168.1.1" in
+  let dirty = "target; rm -rf /" in
+  (* Clean input: both accept *)
+  (match Hexstrike_Sanitize.sanitize clean with
+   | Some _ -> ()
+   | None -> Alcotest.fail "F* sanitize should accept clean input");
+  (match Sanitize.sanitize clean with
+   | Ok _ -> ()
+   | Error e -> Alcotest.fail ("hand-written sanitize should accept: " ^ e));
+  (* Dirty input: both reject *)
+  (match Hexstrike_Sanitize.sanitize dirty with
+   | None -> ()
+   | Some _ -> Alcotest.fail "F* sanitize should reject metacharacters");
+  match Sanitize.sanitize dirty with
+  | Error _ -> ()
+  | Ok _ -> Alcotest.fail "hand-written sanitize should reject"
+
+let test_fstar_audit_verify () =
+  (* Create an entry using the F*-extracted audit module *)
+  let ae = Hexstrike_Audit.create_entry
+    ~entry_id:"test-123" ~prev_hash:Hexstrike_Audit.genesis_hash
+    ~timestamp:"2026-02-26T00:00:00Z"
+    ~caller:"test" ~tool_name:"port_scan"
+    ~decision:Hexstrike_Types.Allowed ~risk:Hexstrike_Types.Medium
+    ~duration:100 ~result:"ok" in
+  Alcotest.(check bool) "F* entry verifies" true (Hexstrike_Audit.verify_entry ae);
+  (* Tamper and verify detection *)
+  let tampered = { ae with Hexstrike_Audit.ae_result = "tampered" } in
+  Alcotest.(check bool) "F* tamper detected" false (Hexstrike_Audit.verify_entry tampered)
+
+let test_fstar_policy_denied () =
+  (* Exercise the proved denied-always-denied lemma via evaluate_policy *)
+  let pol : Hexstrike_Types.policy = {
+    pol_name = "test";
+    pol_allowed_tools = ["*"];
+    pol_denied_tools = ["evil_tool"];
+    pol_max_risk_level = Hexstrike_Types.Critical;
+    pol_audit_level = Hexstrike_Types.Standard;
+  } in
+  let tc : Hexstrike_Types.tool_call = {
+    tc_tool_name = "evil_tool";
+    tc_caller = "anyone";
+    tc_target = "127.0.0.1";
+    tc_request_id = "req-1";
+  } in
+  let cap : Hexstrike_Types.tool_capability = {
+    cap_name = "evil_tool";
+    cap_category = "test";
+    cap_risk_level = Hexstrike_Types.Low;
+    cap_max_exec_secs = 5;
+  } in
+  let decision = Hexstrike_Policy.evaluate_policy pol tc cap in
+  match decision with
+  | Hexstrike_Types.Denied _ -> ()
+  | Hexstrike_Types.Allowed -> Alcotest.fail "denied tool should always be denied (F* proved)"
+
 (* ── Test Runner ──────────────────────────────────── *)
 
 let () =
@@ -274,5 +444,25 @@ let () =
       Alcotest.test_case "classify ports" `Quick test_futhark_classify;
       Alcotest.test_case "pattern match" `Quick test_futhark_pattern;
       Alcotest.test_case "graph density" `Quick test_futhark_density;
+    ]);
+    ("subprocess", [
+      Alcotest.test_case "stderr separation" `Quick test_subprocess_stderr;
+    ]);
+    ("binary_check", [
+      Alcotest.test_case "required binary field" `Quick test_binary_check;
+    ]);
+    ("tool_output", [
+      Alcotest.test_case "envelope structure" `Quick test_output_envelope;
+      Alcotest.test_case "error envelope" `Quick test_output_envelope_error;
+      Alcotest.test_case "pure envelope" `Quick test_output_envelope_pure;
+    ]);
+    ("futhark_ffi", [
+      Alcotest.test_case "fallback to stubs" `Quick test_ffi_fallback;
+      Alcotest.test_case "stub parity" `Quick test_ffi_stub_parity;
+    ]);
+    ("fstar_extraction", [
+      Alcotest.test_case "sanitize parity" `Quick test_fstar_sanitize_parity;
+      Alcotest.test_case "audit verify" `Quick test_fstar_audit_verify;
+      Alcotest.test_case "policy denied" `Quick test_fstar_policy_denied;
     ]);
   ]

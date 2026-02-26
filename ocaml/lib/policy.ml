@@ -1,6 +1,4 @@
-(** Policy engine: loads Dhall-rendered JSON policies at startup,
-    evaluates access control decisions.
-
+(** Policy engine — wraps verified Hexstrike_Policy core with Dhall grant parsing.
     Uses the same compiled Dhall JSON format as the Go gateway:
     {
       "grants": [{"src": "...", "dst": "...", "app": [...], ...}],
@@ -8,7 +6,8 @@
       "version": "..."
     }
 
-    This ensures MCP/ACP parity: one Dhall source, identical semantics. *)
+    Core denied/risk checks delegate to the F*-extracted Hexstrike_Policy module.
+    Dhall grants, wildcards, and namespace resolution are beyond F* scope. *)
 
 type severity = Info | Low | Medium | High | Critical
 
@@ -54,6 +53,10 @@ let audit_level_of_string = function
 
 let severity_leq a b = severity_to_int a <= severity_to_int b
 
+(** Use F*-extracted denied check — proved that denied always overrides grants *)
+let is_denied_fstar (tool_name : string) (denied : string list) : bool =
+  Hexstrike_Policy.mem tool_name denied
+
 let match_caller pattern caller =
   if pattern = "*" then true
   else if String.length pattern > 0
@@ -88,8 +91,8 @@ let default_policy = {
     3. No grants = allow all
     4. Grants iterated in order; first matching grant wins *)
 let evaluate (pol : policy) ~(caller : string) (tool_name : string) (risk : severity) : decision =
-  (* Step 1: denied list takes absolute precedence *)
-  if List.mem tool_name pol.compiled.denied then
+  (* Step 1: denied list takes absolute precedence (F*-verified) *)
+  if is_denied_fstar tool_name pol.compiled.denied then
     Denied "tool is explicitly denied by policy"
   (* Step 2: risk level gate *)
   else if not (severity_leq risk pol.max_risk_level) then

@@ -63,6 +63,11 @@ jobs:
       - uses: DeterminateSystems/nix-installer-action@main
       - uses: DeterminateSystems/magic-nix-cache-action@main
       - run: nix develop .#fstar --command just fstar-extract
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fstar-extracted
+          path: fstar/out/*.ml
+          if-no-files-found: warn
 
   futhark-build:
     name: Futhark compile
