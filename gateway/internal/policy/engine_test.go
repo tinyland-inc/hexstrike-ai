@@ -231,6 +231,62 @@ func TestParameterConstraints(t *testing.T) {
 	}
 }
 
+// TestPolicyCoverage verifies every tool in the manifest is granted to at least
+// one non-operator role (operator uses wildcard "*" so it trivially covers all).
+func TestPolicyCoverage(t *testing.T) {
+	allTools := []string{
+		"port_scan", "host_discovery", "nmap_scan", "network_posture",
+		"subdomain_enum", "dns_recon",
+		"dir_discovery", "vuln_scan", "sqli_test", "xss_test", "waf_detect", "web_crawl",
+		"api_fuzz", "graphql_scan", "jwt_analyze",
+		"tls_check",
+		"credential_scan", "sops_rotation_check", "brute_force", "hash_crack",
+		"smb_enum", "network_exec", "rpc_enum",
+		"cloud_posture", "container_scan", "iac_scan", "k8s_audit",
+		"disassemble", "debug", "gadget_search", "firmware_analyze",
+		"memory_forensics", "file_carving", "steganography", "metadata_extract",
+		"cve_monitor", "exploit_gen", "threat_correlate",
+		"smart_scan", "target_profile",
+		"server_health", "execute_command",
+	}
+
+	// Build a policy matching hexstrike-agent grants (non-wildcard).
+	e := &Engine{
+		policy: CompiledPolicy{
+			Grants: []Grant{
+				{
+					Src: "hexstrike-agent", Dst: "*",
+					App: []string{
+						"port_scan", "host_discovery", "nmap_scan", "network_posture",
+						"subdomain_enum", "dns_recon", "tls_check",
+						"credential_scan", "sops_rotation_check", "brute_force", "hash_crack",
+						"dir_discovery", "vuln_scan", "sqli_test", "xss_test", "waf_detect", "web_crawl",
+						"api_fuzz", "graphql_scan", "jwt_analyze",
+						"smb_enum", "network_exec", "rpc_enum",
+						"cloud_posture", "container_scan", "iac_scan", "k8s_audit",
+						"disassemble", "debug", "gadget_search", "firmware_analyze",
+						"memory_forensics", "file_carving", "steganography", "metadata_extract",
+						"cve_monitor", "exploit_gen", "threat_correlate",
+						"smart_scan", "target_profile",
+						"server_health", "execute_command",
+					},
+				},
+			},
+		},
+	}
+
+	var ungrantable []string
+	for _, tool := range allTools {
+		d := e.Evaluate("hexstrike-agent", tool)
+		if !d.Allowed {
+			ungrantable = append(ungrantable, tool)
+		}
+	}
+	if len(ungrantable) > 0 {
+		t.Errorf("tools not in any hexstrike-agent grant: %v", ungrantable)
+	}
+}
+
 func TestReload(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "policy.json")
