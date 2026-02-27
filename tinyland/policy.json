@@ -1,0 +1,81 @@
+{
+  "grants": [
+    {
+      "src": "hexstrike-ai-agent@fuzzy-dev",
+      "app": [
+        "credential_scan",
+        "tls_check",
+        "port_scan",
+        "container_scan",
+        "vuln_scan",
+        "container_vuln",
+        "dns_enum",
+        "header_audit",
+        "ssl_cipher_check",
+        "dependency_check",
+        "secret_entropy",
+        "git_history_scan",
+        "sbom_generate",
+        "config_audit",
+        "compliance_check",
+        "network_posture",
+        "api_fuzz",
+        "sops_rotation_check",
+        "cve_monitor"
+      ],
+      "dst": "*",
+      "description": "Agent identity: full security scanning toolkit"
+    },
+    {
+      "src": "campaign-runner@fuzzy-dev",
+      "app": [
+        "credential_scan",
+        "tls_check",
+        "port_scan",
+        "container_scan",
+        "vuln_scan"
+      ],
+      "dst": "*",
+      "description": "Campaign runner: read-only scan tools"
+    },
+    {
+      "src": "*@taila4c78d.ts.net",
+      "app": [
+        "credential_scan",
+        "tls_check",
+        "port_scan",
+        "container_scan",
+        "vuln_scan",
+        "container_vuln",
+        "dns_enum",
+        "header_audit",
+        "ssl_cipher_check",
+        "dependency_check",
+        "secret_entropy",
+        "git_history_scan",
+        "sbom_generate",
+        "config_audit",
+        "compliance_check",
+        "network_posture",
+        "api_fuzz",
+        "sops_rotation_check",
+        "cve_monitor"
+      ],
+      "dst": "*",
+      "description": "Tailnet admins: full access"
+    },
+    {
+      "src": "*@fuzzy-dev",
+      "app": [
+        "credential_scan",
+        "tls_check",
+        "port_scan",
+        "container_scan",
+        "vuln_scan"
+      ],
+      "dst": "*",
+      "description": "Tailnet members: read-only scan subset"
+    }
+  ],
+  "defaultDeny": true
+}
